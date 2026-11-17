@@ -147,14 +147,16 @@ h3{font-size:15px;font-weight:700}
 .chips::-webkit-scrollbar{display:none}
 .compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .rc{border-radius:18px;padding:14px;background:#fff;border:1.5px solid var(--line);display:flex;flex-direction:column;gap:4px;text-align:left;position:relative}
-.rc.rec{border:2px solid var(--leaf);background:var(--mint)}
+.rc.rec{border:2px solid #1f74d6;background:#eaf2fc}
+.rc.gen{border-color:#f1b9b2;background:#fdf2f0}
+.rc.gen .k{color:#c2412d}
 .rc[aria-pressed="false"]{opacity:.5}
 .rc .k{font-size:12px;color:var(--sub);font-weight:600}
-.rc.rec .k{color:var(--leaf)}
+.rc.rec .k{color:#1d63b8}
 .rc .t{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.15}
 .rc .t small{font-size:13px;font-weight:500;color:var(--sub);margin-left:4px;letter-spacing:0}
 .rc .e{font-size:13px;font-weight:700}
-.e-low{color:var(--good)} .e-high{color:var(--bad)}
+.e-low{color:#1d63b8} .e-high{color:#c2412d}
 .explain{font-size:13.5px;color:var(--ink);margin:0;line-height:1.55}
 .naverbtn .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;background:#03c75a;color:#fff;font-weight:800;font-size:12px}
 
@@ -370,7 +372,7 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
       <div class="card">
         <h3 id="mTitle">이 경로의 월별 노출</h3>
         <div class="chart" id="mchart"></div>
-        <div class="legend"><span><span class="dot" style="background:#b8c4bc"></span>최단 경로</span><span><span class="dot" style="background:var(--leaf)"></span>숨 편한 경로</span></div>
+        <div class="legend"><span><span class="dot" style="background:#ef9a91"></span>최단 경로</span><span><span class="dot" style="background:#1f74d6"></span>숨 편한 경로</span></div>
       </div>
       <div class="card">
         <h3>한강공원 월별 피크닉 위험도</h3>
@@ -708,8 +710,8 @@ function run(){
   last=plan(state.month);
   if(!last){cards.innerHTML='<p class="note">두 지점이 이어지지 않아요. 다른 곳을 골라 주세요.</p>';return;}
   const g=last.gen,c=last.clean,same=c.edges.join()===g.edges.join()||c.ex>=g.ex*0.995;
-  if(state.show.gen){const ll=lineOf(g.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:8,opacity:.9,z:2}));routeLayer.add(M.line(ll,{color:'#5f6f67',weight:4.5,dash:'long',z:3}));}
-  if(state.show.clean&&!same){const ll=lineOf(c.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:11,opacity:.95,z:4}));routeLayer.add(M.line(ll,{color:'#2e6b4f',weight:6.5,z:5}));}
+  if(state.show.gen){const ll=lineOf(g.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:10,opacity:.55,z:2}));routeLayer.add(M.line(ll,{color:'#e0453a',weight:7,opacity:.55,z:3}));}
+  if(state.show.clean&&!same){const ll=lineOf(c.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:11,opacity:.55,z:4}));routeLayer.add(M.line(ll,{color:'#1f74d6',weight:7.5,opacity:.62,z:5}));}
   const de=g.ex>0?Math.round((1-c.ex/g.ex)*100):0,dm=mins(c.L)-mins(g.L);
   // 줄어든 요인 중 가장 큰 것
   const cut=['C','T','P'].map(k=>[k,state.w[k]*(g.parts[k]-c.parts[k])]).sort((a,b)=>b[1]-a[1]);
@@ -720,7 +722,7 @@ function run(){
   cards.innerHTML=`<div class="compare">
     <button type="button" class="rc rec" data-k="clean" aria-pressed="${state.show.clean}">
       <span class="k">숨 편한 경로${same?'':' (추천)'}</span><span class="t">${mins(c.L)}분<small>${fmtM(c.L)}</small></span><span class="e e-low">노출 ${same?'같음':de+'% 낮음'}</span></button>
-    <button type="button" class="rc" data-k="gen" aria-pressed="${state.show.gen}">
+    <button type="button" class="rc gen" data-k="gen" aria-pressed="${state.show.gen}">
       <span class="k">최단 경로${state.via.length?` · 경유 ${state.via.length}`:''}</span><span class="t">${mins(g.L)}분<small>${fmtM(g.L)}</small></span><span class="e ${same?'':'e-high'}">노출 ${same?'같음':'높음'}</span></button>
   </div>
   <p class="explain">${explain}</p>
@@ -731,15 +733,15 @@ function monthChart(){
   if(state.o==null||state.d==null||!plan(state.month)){$('mchart').innerHTML='<p class="note">경로 탭에서 출발·도착을 고르면 이 경로의 월별 비교가 나와요.</p>';return;}
   $('mTitle').textContent=`${$('inO').value.replace(/ \(.*\)/,'')} → ${$('inD').value.replace(/ \(.*\)/,'')}`;
   const rows=[];for(let m=1;m<=12;m++){const p=plan(m);rows.push({m,g:p.gen.ex,c:p.clean.ex,same:p.clean.edges.join()===p.gen.edges.join()||p.clean.ex>=p.gen.ex*0.995});}
-  bars($('mchart'),rows.map(r=>({m:r.m,a:r.g,b:r.c,lab:r.same?'–':Math.round((r.c/r.g-1)*100)})),'월별 최단 경로와 숨 편한 경로 노출');
+  bars($('mchart'),rows.map(r=>({m:r.m,a:r.g,b:r.c,lab:r.same?'–':Math.round((r.c/r.g-1)*100)})),'월별 최단 경로와 숨 편한 경로 노출',['#ef9a91','#1f74d6']);
 }
-function bars(el,rows,aria){
+function bars(el,rows,aria,col=['#b8c4bc','#2e6b4f']){
   const W=340,H=160,pl=4,pr=4,pt=20,pb=22,bw=(W-pl-pr)/12,top=Math.max(...rows.map(r=>r.a))*1.08||1,y=v=>H-pb-(v/top)*(H-pb-pt);
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}"><line x1="${pl}" x2="${W-pr}" y1="${H-pb}" y2="${H-pb}" stroke="#e3e9e4"/>`;
   rows.forEach((r,i)=>{const x=pl+i*bw,cur=r.m===state.month,w=(bw-7)/2;
     if(cur)s+=`<rect x="${x+1}" y="2" width="${bw-2}" height="${H-4}" rx="8" fill="#e6f2ea"/>`;
-    s+=`<rect x="${x+3.5}" y="${y(r.a)}" width="${w}" height="${H-pb-y(r.a)}" rx="3" fill="#b8c4bc"/>`;
-    s+=`<rect x="${x+3.5+w}" y="${y(r.b)}" width="${w}" height="${Math.max(1,H-pb-y(r.b))}" rx="3" fill="#2e6b4f"/>`;
+    s+=`<rect x="${x+3.5}" y="${y(r.a)}" width="${w}" height="${H-pb-y(r.a)}" rx="3" fill="${col[0]}"/>`;
+    s+=`<rect x="${x+3.5+w}" y="${y(r.b)}" width="${w}" height="${Math.max(1,H-pb-y(r.b))}" rx="3" fill="${col[1]}"/>`;
     s+=`<text class="val" x="${x+bw/2}" y="${y(r.a)-5}" text-anchor="middle">${r.lab}</text>`;
     s+=`<text x="${x+bw/2}" y="${H-6}" text-anchor="middle" ${cur?'style="fill:#1b2b22;font-weight:700"':''}>${r.m}월</text>`;
     s+=`<rect class="hit" data-m="${r.m}" x="${x}" y="0" width="${bw}" height="${H}"><title>${r.m}월</title></rect>`;});
