@@ -63,8 +63,8 @@ button{cursor:pointer}
 .sheet[data-snap="peek"] .scroll{overflow:hidden}
 .scroll{overflow-y:auto;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overscroll-behavior:contain}
 .view{display:none;flex-direction:column;gap:12px}
-body[data-view="home"] .view[data-v="home"],body[data-view="route"] .view[data-v="route"],body[data-view="picnic"] .view[data-v="picnic"],body[data-view="month"] .view[data-v="month"]{display:flex}
-nav.tabbar{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#fff;border-top:1px solid var(--line);padding:4px 8px calc(6px + env(safe-area-inset-bottom))}
+body[data-view="home"] .view[data-v="home"],body[data-view="route"] .view[data-v="route"],body[data-view="picnic"] .view[data-v="picnic"],body[data-view="month"] .view[data-v="month"],body[data-view="report"] .view[data-v="report"],body[data-view="settings"] .view[data-v="settings"]{display:flex}
+nav.tabbar{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff;border-top:1px solid var(--line);padding:4px 8px calc(6px + env(safe-area-inset-bottom))}
 nav.tabbar a{height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-decoration:none;color:#7b8c83;font-size:11.5px;font-weight:500;border-radius:12px}
 nav.tabbar a svg{width:23px;height:23px}
 nav.tabbar a[aria-current="page"]{color:var(--forest);font-weight:700}
@@ -208,6 +208,23 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
 .vmark{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #6b7a72;display:grid;place-items:center;font:800 9px var(--f)}
 .lf-center{width:0!important;height:0!important}
 .lf-center>*{transform:translate(-50%,-50%)}
+.q{display:flex;flex-direction:column;gap:8px}
+.chipset{display:flex;gap:8px;flex-wrap:wrap}
+.chipset button{height:38px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-weight:600;font-size:13.5px;color:var(--ink)}
+.chipset button[aria-pressed="true"]{background:var(--mint);border-color:var(--leaf);color:var(--forest)}
+.hint-box{background:var(--mint);border-radius:14px;padding:12px 14px;font-size:12.5px;color:var(--forest);margin:0;line-height:1.55}
+.linklike{border:0;background:none;color:var(--sub);font-weight:600;font-size:13px;padding:8px}
+dialog#onb{border:0;padding:0;width:min(440px,100vw);height:min(760px,100dvh);max-height:100dvh;border-radius:24px;color:var(--ink);background:var(--bg)}
+dialog#onb::backdrop{background:rgba(20,35,27,.45)}
+.onb{height:100%;max-height:none;justify-content:space-between}
+.onbpage{display:flex;flex-direction:column;gap:12px;flex:1}
+.onbpage[hidden]{display:none}
+.onbhero{display:flex;gap:12px;align-items:center}.onbhero svg{width:48px;height:48px;flex:none}
+@media (max-width:520px){dialog#onb{border-radius:0;width:100vw;height:100dvh}}
+.toast{position:fixed;z-index:3000;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--forest);color:#fff;border-radius:999px;padding:10px 18px;font-weight:600;font-size:14px;box-shadow:var(--sh);max-width:calc(100vw - 32px)}
+.rep{background:#fff;border-radius:16px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.rep .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.rmark{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 11px var(--f);color:#fff;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .foot{font-size:11px;color:#8a9a91;text-align:center;padding:4px 0 2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -364,11 +381,48 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
       <details>
         <summary>계산 방식과 데이터</summary>
         <p><b>최단 경로</b>는 보행망 위 가장 짧은 길이에요. 네이버 도보 길찾기도 기본은 최단·최소시간이라 비슷하지만 같지는 않아요.</p>
-        <p><b>숨 편한 경로</b>는 링크 비용 = 길이 × (1 + 가중치 × 노출)인 최단경로예요. 가중치 배율을 0~16배로 바꿔 찾은 후보 중, 최단거리의 1.3배 안에서 노출이 가장 적은 길을 골라요.</p>
+        <p><b>숨 편한 경로</b>는 링크 비용 = 길이 × (1 + 가중치 × 노출)인 최단경로예요. 가중치 배율을 0~16배로 바꿔 찾은 후보 중, 내 설정의 "더 걸을 시간"(기본 10분) 안에서 노출이 가장 적은 길을 골라요.</p>
         <p><b>노출</b> 공사장 exp(−거리/75m), 평일 7–18시 작업 가정(그 외 0.15). 교통 배기가스 간선 등급 × exp(−거리/50m), 출퇴근 ×1.3. 꽃가루 그 달 비산 수목(상 1, 중 0.5) 커널합 exp(−거리/30m). 건물 안 길은 20%.</p>
         <p><b>가중치</b> 우리 설문(2026.9.30–10.1, 56명)의 요인별 경험 빈도 × 불편 점수. 전체: 공사 1.53 · 교통 1.78 · 꽃가루 1.19. 꽃가루 민감(꽃가루 불편 4–5점, 14명): 1.09 · 0.90 · 2.51. 응답자가 20대에 몰려 있어 대표성 한계가 있어요.</p>
+        <p><b>내 숨 설정</b> 비염·아토피를 고르거나 예민한 나무를 고르면 꽃가루 민감 가중치에서 시작하고, 천식이면 배기가스·공사 먼지를 1.3배로 봐요. 예민한 나무를 고르면 그 나무가 꽃가루를 날리는 달엔 꽃가루를 1.5배, 다른 달엔 0.6배로 봐요(양버즘나무·참나무·은행나무 4–5월, 버드나무 3–4월, 소나무 5월, 메타세쿼이아 2–3월). 러닝은 호흡량이 많아 노출 전체를 더 크게 피해요.</p>
+        <p><b>숨제보</b> 제보 위치에서 60m 감쇠로 해당 요인 노출을 더해요(정도 1–3, 3일에 걸쳐 줄어듦). 꽃가루 날림·재채기·눈 가려움은 꽃가루, 배기가스·목 따가움·기침은 배기가스, 공사장 먼지는 공사장으로 넣어요.</p>
         <p><b>데이터</b> 서울시 자치구별 도보 네트워크(서초구), 서울시 가로수·공원/사유지 수목(5,502그루), OpenStreetMap(한강공원 산책로·간선도로·공사구역·장소), 배경 지도는 OpenStreetMap 도로 자료로 직접 그림. 역 위치는 대략값이에요.</p>
       </details>
+    </section>
+
+    <!-- 숨제보 -->
+    <section class="view" data-v="report" aria-label="숨제보">
+      <div><span class="h-sub" style="color:var(--leaf);font-weight:700">숨제보</span><h1 style="font-size:22px;margin-top:2px">지금 이 자리, 숨쉬기 어떤가요?</h1></div>
+      <div class="q"><h3>무엇을 알려주실래요?</h3><div class="chipset" id="rCat" data-single></div></div>
+      <div class="q" id="rSymWrap"><h3>어떤 증상인가요?</h3><div class="chipset" id="rSym"></div></div>
+      <div class="q"><h3>얼마나 불편한가요?</h3><div class="chipset" id="rSev" data-single></div></div>
+      <div class="card" style="gap:8px">
+        <div class="between"><b style="font-size:14px">위치</b><span class="note" id="rLocTxt">아직 안 골랐어요</span></div>
+        <div class="row" style="flex-wrap:nowrap"><button class="btn sm ghost" type="button" id="rHere" style="flex:1">◎ 현재 위치</button><button class="btn sm ghost" type="button" id="rPick" style="flex:1">지도에서 고르기</button></div>
+        <label for="rMemo" class="note">한 줄 메모 (선택)</label>
+        <input id="rMemo" maxlength="60" placeholder="예: 잠원로 양버즘나무 아래 꽃가루 많음" style="height:42px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px;background:#fff">
+      </div>
+      <p class="hint-box">제보는 바로 지도와 경로 계산에 반영돼요. 제보한 곳 주변 길은 노출이 높게 잡혀서 숨 편한 경로가 그쪽을 피해요. 지금은 이 기기에만 저장되고 3일이 지나면 효과가 사라져요.</p>
+      <button class="btn" type="button" id="rSend">제보 보내기</button>
+      <div id="rList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </section>
+
+    <!-- 설정 -->
+    <section class="view" data-v="settings" aria-label="설정">
+      <h1 style="font-size:22px">내 숨 설정</h1>
+      <div class="card" id="profSummary"></div>
+      <button class="btn ghost" type="button" id="reOnboard">내 숨 설정 다시 하기</button>
+      <div class="card" style="gap:8px">
+        <h3>보기 조건</h3>
+        <p class="note">월·요일·시간과 가중치는 여기서 바꿔요.</p>
+        <button class="btn sm ghost" type="button" data-open-cond>조건 바꾸기</button>
+      </div>
+      <div class="card" style="gap:8px">
+        <h3>내 제보</h3><p class="note" id="repCount"></p>
+        <button class="btn sm ghost" type="button" id="clearReports">내 제보 모두 지우기</button>
+      </div>
+      <div class="quick" style="grid-template-columns:repeat(2,minmax(0,1fr))"><a href="#month">월별 보기</a><a href="https://github.com/whywhy4848/EP" target="_blank" rel="noopener">만든 방법</a></div>
+      <p class="note">고른 정보는 이 기기의 브라우저에만 저장되고 어디로도 보내지 않아요. 의료 기록과도 연결하지 않아요.</p>
     </section>
 
     <div class="foot">연세대 도시공학과 CRP2340 환경계획 팀 프로젝트 · 연구용 프로토타입</div>
@@ -377,9 +431,39 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
     <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>홈</a>
     <a href="#route" data-tab="route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8"/></svg>경로</a>
     <a href="#picnic" data-tab="picnic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M12 13v8M8 21h8"/></svg>피크닉</a>
-    <a href="#month" data-tab="month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M10 20V6M15 20v-7M20 20V9"/></svg>월별</a>
+    <a href="#report" data-tab="report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-7l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M12 8.5v3.5M12 14.5v.01"/></svg>제보</a>
+    <a href="#settings" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.2-3.6 4.2-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg>설정</a>
   </nav>
 </aside>
+
+<dialog id="onb" aria-labelledby="onbTitle">
+  <form method="dialog" class="dlg onb">
+    <div class="between"><span class="h-sub" id="onbStep">처음 한 번만 · 1/2</span><button type="button" class="linklike" id="onbSkip">건너뛰기</button></div>
+    <div class="onbpage" data-p="1">
+      <div class="onbhero"><svg aria-hidden="true"><use href="#logo"/></svg><div><h2 id="onbTitle" style="font-size:21px">어떤 바깥 활동을 주로 하세요?</h2><p class="note">여러 개 골라도 돼요</p></div></div>
+      <div class="chipset" id="oAct"></div>
+      <h3>호흡기 상태 <span class="note">(선택)</span></h3>
+      <div class="chipset" id="oResp"></div>
+      <h3>특히 예민한 나무</h3>
+      <div class="chipset" id="oTree"></div>
+      <p class="hint-box">의료 기록과 연결하지 않아요. 직접 고른 정보로만 위험 점수를 조정하고, 이 기기 밖으로 보내지 않아요.</p>
+    </div>
+    <div class="onbpage" data-p="2" hidden>
+      <h2 style="font-size:21px">언제, 얼마나 돌아가도 괜찮아요?</h2>
+      <h3>주로 걷는 시간</h3>
+      <div class="chipset" id="oTime" data-single></div>
+      <h3>숨 편한 길이라면 몇 분까지 더 걸을 수 있어요?</h3>
+      <div class="chipset" id="oDetour" data-single></div>
+      <div class="card" style="background:var(--mint)"><b style="font-size:13.5px">이렇게 맞춰 드릴게요</b><p class="note" id="oPreview" style="color:var(--ink)"></p></div>
+    </div>
+    <div class="row" style="flex-wrap:nowrap">
+      <button type="button" class="btn ghost" id="onbBack" hidden style="flex:1">이전</button>
+      <button type="button" class="btn" id="onbNext" style="flex:2">다음</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <dialog id="condDlg" aria-labelledby="condTitle">
   <form method="dialog" class="dlg">
@@ -391,7 +475,7 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
     </div>
     <p class="note" id="whenNote"></p>
     <div><h3 style="margin-bottom:8px">누구 기준</h3>
-      <div class="seg" id="persona" role="group" aria-label="기준"><button type="button" data-v="all" aria-pressed="true">모두</button><button type="button" data-v="alg" aria-pressed="false">꽃가루 민감</button><button type="button" data-v="custom" aria-pressed="false">직접 조정</button></div>
+      <div class="seg" id="persona" role="group" aria-label="기준"><button type="button" data-v="mine" aria-pressed="false">내 설정</button><button type="button" data-v="all" aria-pressed="true">모두</button><button type="button" data-v="alg" aria-pressed="false">꽃가루 민감</button><button type="button" data-v="custom" aria-pressed="false">직접 조정</button></div>
       <p class="note" id="pnote" style="margin-top:6px"></p>
     </div>
     <div class="legend" id="wview"></div>
@@ -401,8 +485,8 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
         <div class="slider"><label for="wC"><span class="dot" style="background:var(--coral)"></span> 공사장</label><input type="range" id="wC" min="0" max="4" step="0.1" value="1.53"><output id="oC">1.5</output></div>
         <div class="slider"><label for="wT"><span class="dot" style="background:var(--lav)"></span> 교통배기</label><input type="range" id="wT" min="0" max="4" step="0.1" value="1.78"><output id="oT">1.8</output></div>
         <div class="slider"><label for="wP"><span class="dot" style="background:var(--pollen)"></span> 꽃가루</label><input type="range" id="wP" min="0" max="4" step="0.1" value="1.19"><output id="oP">1.2</output></div>
-        <div class="slider"><label for="cap">우회 허용</label><input type="range" id="cap" min="1.1" max="1.6" step="0.05" value="1.3"><output id="oCap">1.30</output></div>
-        <p class="note">우회 허용 1.30 = 최단 경로보다 최대 30% 더 걷는 범위에서 찾아요.</p>
+        <div class="slider"><label for="cap">더 걸을 시간</label><input type="range" id="cap" min="0" max="20" step="1" value="10"><output id="oCap">10분</output></div>
+        <p class="note">숨 편한 길이 최단 경로보다 이 시간 넘게 더 걸리면 고르지 않아요.</p>
         <div class="row"><button class="btn sm ghost" id="addSite" type="button" aria-pressed="false">지도에 공사장 찍기</button><button class="btn sm ghost" id="clearSites" type="button">추가한 공사장 지우기</button></div>
         <p class="note" id="siteNote"></p>
       </div>
@@ -437,11 +521,11 @@ function computeC(){const sites=[...osmSites,...userSites];G.edges.forEach(e=>{l
 const MONTHS=G.months;
 const now=new Date();
 const clampHour=h=>Math.min(23,Math.max(6,h));
-const state={month:now.getMonth()+1,hour:clampHour(now.getHours()),weekday:(now.getDay()%6)?1:0,w:{C:1.53,T:1.78,P:1.19},cap:1.3,persona:'all',
+const state={month:now.getMonth()+1,hour:clampHour(now.getHours()),weekday:(now.getDay()%6)?1:0,w:{C:1.53,T:1.78,P:1.19},extraMin:10,persona:'all',
   o:null,d:null,via:[],show:{gen:true,clean:true},mode:null,layer:'none'};
 const workOn=()=>state.weekday&&state.hour>=7&&state.hour<18;
 const peakOn=()=>[7,8,17,18,19].includes(state.hour);
-function expoAt(e,month){const mi=MONTHS.indexOf(month);return {C:e.C*(workOn()?1:0.15),T:e.T*(peakOn()?1.3:1),P:mi>=0?e.P[mi]:0};}
+function expoAt(e,month){const mi=MONTHS.indexOf(month);return {C:e.C*(workOn()?1:0.15)+(e.Rc||0),T:e.T*(peakOn()?1.3:1)+(e.Rt||0),P:(mi>=0?e.P[mi]:0)*pollenMul(month)+(e.Rp||0)};}
 const wsum=x=>state.w.C*x.C+state.w.T*x.T+state.w.P*x.P;
 const hourLabel=h=>h<12?`오전 ${h}시`:h===12?'낮 12시':`오후 ${h-12}시`;
 
@@ -463,7 +547,7 @@ function summarize(edges,month){let L=0;const parts={C:0,T:0,P:0};edges.forEach(
 function generalRoute(){const seq=[state.o,...state.via.map(v=>v.node),state.d];let all=[];for(let i=0;i<seq.length-1;i++){const p=dijkstra(seq[i],seq[i+1],LEN);if(!p)return null;all=all.concat(p);}return all;}
 let siteVer=0;const planCache=new Map();
 function plan(month){
-  const key=[month,state.o,state.d,state.via.map(v=>v.node).join('-'),state.w.C,state.w.T,state.w.P,state.cap,state.hour,state.weekday,siteVer].join('|');
+  const key=[month,state.o,state.d,state.via.map(v=>v.node).join('-'),state.w.C,state.w.T,state.w.P,state.extraMin,state.persona,state.hour,state.weekday,siteVer,repVer].join('|');
   if(planCache.has(key))return planCache.get(key);
   const gen=generalRoute();if(!gen){planCache.set(key,null);return null;}
   const g=summarize(gen,month);const X=G.edges.map(e=>expoAt(e,month));
@@ -471,7 +555,7 @@ function plan(month){
   for(const k of [0,0.25,0.5,1,2,4,8,16]){
     const cost=G.edges.map((e,i)=>e.len*(1+k*wsum(X[i])));const p=dijkstra(state.o,state.d,cost);if(!p)continue;
     const s=summarize(p,month);
-    if(s.L<=state.cap*Math.max(Lsp,g.L)+1e-6&&(!best||s.ex<best.ex-1e-9||(Math.abs(s.ex-best.ex)<1e-9&&s.L<best.L)))best=s;
+    if(s.L<=Math.max(Lsp,g.L)+state.extraMin*72+1e-6&&(!best||s.ex<best.ex-1e-9||(Math.abs(s.ex-best.ex)<1e-9&&s.L<best.L)))best=s;
   }
   if(!best||best.ex>=g.ex)best=g;
   const r={gen:g,clean:best};planCache.set(key,r);return r;
@@ -598,7 +682,8 @@ $('hour').innerHTML=Array.from({length:18},(_,i)=>i+6).map(h=>`<option value="${
 $('hour').onchange=()=>{state.hour=+$('hour').value;whenNote();update();};
 function whenNote(){$('whenNote').textContent=(workOn()?'공사 작업 시간':'공사 쉬는 시간')+(peakOn()?' · 출퇴근 교통 많음':'')+(MONTHS.includes(state.month)?' · 수목 꽃가루 날리는 달':' · 수목 꽃가루 없는 달');}
 [['wC','C','oC'],['wT','T','oT'],['wP','P','oP']].forEach(([id,k,o])=>{const el=$(id);el.oninput=()=>{state.w[k]=+el.value;$(o).textContent=(+el.value).toFixed(1);};el.onchange=()=>{setPersona('custom',true);update();};});
-function setPersona(p,keep){
+PERSONA.mine={w:{C:1.53,T:1.78,P:1.19},label:'내 설정',note:''};
+function setPersona(p,keep){if(p==='mine'&&!profile){openOnboarding();return;}
   state.persona=p;$('persona').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===p));
   if(PERSONA[p]&&!keep){state.w={...PERSONA[p].w};[['wC','C','oC'],['wT','T','oT'],['wP','P','oP']].forEach(([id,k,o])=>{$(id).value=state.w[k];$(o).textContent=state.w[k].toFixed(1);});}
   $('pnote').textContent=PERSONA[p]?PERSONA[p].note:'아래 슬라이더 값으로 계산해요.';
@@ -606,7 +691,7 @@ function setPersona(p,keep){
   renderCond();
 }
 $('persona').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v==='custom'){setPersona('custom',true);$('wdetails').open=true;return;}setPersona(b.dataset.v);update();};
-$('cap').oninput=()=>{state.cap=+$('cap').value;$('oCap').textContent=(+$('cap').value).toFixed(2);};$('cap').onchange=()=>update();
+$('cap').oninput=()=>{state.extraMin=+$('cap').value;$('oCap').textContent=state.extraMin+'분';};$('cap').onchange=()=>{saveProfileExtra();update();};
 $('layer').onchange=e=>{state.layer=e.target.value;drawNet();};
 $('layerBtn').onclick=()=>{const p=$('layerPick');p.hidden=!p.hidden;$('layerBtn').setAttribute('aria-expanded',!p.hidden);};
 function refreshSites(){siteVer++;computeC();drawSites();update();}
@@ -698,6 +783,7 @@ function fitRoute(){if(!last||state.o==null||state.d==null)return;const pts=line
 M.onClick(ll=>{
   if(state.mode==='site'){userSites.push({kind:'circle',ll,m:toM(ll),r:60});refreshSites();return;}
   if(state.mode==='via'){if(state.o==null||state.d==null)return;state.via.push({node:nearest(ll)});run();return;}
+  if(view==='report'){setRLoc(ll,'지도에서 고른 곳');return;}
   const div=document.createElement('div');div.style.cssText='display:flex;gap:6px';
   div.innerHTML='<button type="button" style="border:0;border-radius:10px;padding:8px 12px;background:#2e6b4f;color:#fff;font:700 13px var(--f)">여기서 출발</button><button type="button" style="border:0;border-radius:10px;padding:8px 12px;background:#d9694a;color:#fff;font:700 13px var(--f)">여기로 도착</button>';
   M.popup([ll[1],ll[0]],div);
@@ -715,9 +801,9 @@ $('clearSites').onclick=()=>{userSites=[];refreshSites();};
 
 // ---------- 피크닉 ----------
 const PM=PIC.months;
-function picX(p,m,h,wd){const work=wd&&h>=7&&h<18,peak=[7,8,17,18,19].includes(h);const mi=PM.indexOf(m);return {C:p.C*(work?1:0.15),T:p.T*(peak?1.3:1),P:mi>=0?p.P[mi]:0};}
+function picX(p,m,h,wd){const work=wd&&h>=7&&h<18,peak=[7,8,17,18,19].includes(h);const mi=PM.indexOf(m);return {C:p.C*(work?1:0.15)+(p.Rc||0),T:p.T*(peak?1.3:1)+(p.Rt||0),P:(mi>=0?p.P[mi]:0)*pollenMul(m)+(p.Rp||0)};}
 let picTopKey=null,picTopVal=1;
-function picTop(){const k=[state.w.C,state.w.T,state.w.P,siteVer].join();if(k===picTopKey)return picTopVal;const a=[];
+function picTop(){const k=[state.w.C,state.w.T,state.w.P,siteVer,state.persona].join();if(k===picTopKey)return picTopVal;const a=[];
   PIC.pts.forEach(p=>{for(let m=1;m<=12;m++)a.push(wsum(picX(p,m,8,1)));});a.sort((x,y)=>x-y);picTopKey=k;picTopVal=a[Math.floor(a.length*.97)]||1;return picTopVal;}
 const score=(p,m,h,wd)=>Math.min(100,Math.round(wsum(picX(p,m,h,wd))/picTop()*100));
 const PLACE_CATS=new Set(['한강','공원','시설','역']);
@@ -784,16 +870,17 @@ function renderHome(){
 
 // ---------- 화면 전환 ----------
 let view='home';
-function update(){renderCond();drawNet();if(view==='route')run();else if(view==='picnic')drawPicnic();else if(view==='month'){monthChart();picChart();}else renderHome();}
+function update(){renderCond();drawNet();drawReports();if(view==='route')run();else if(view==='picnic')drawPicnic();else if(view==='month'){monthChart();picChart();}else if(view==='report')renderReportList();else if(view==='settings')renderSettings();else renderHome();}
 const parkPts=PIC.pts.map(p=>[p.ll[1],p.ll[0]]);
 function setView(v){
-  view=['route','picnic','month'].includes(v)?v:'home';document.body.dataset.view=view;setSnap('half');
+  view=['route','picnic','month','report','settings'].includes(v)?v:'home';document.body.dataset.view=view;setSnap('half');
   document.querySelectorAll('.tabbar a').forEach(a=>{if(a.dataset.tab===view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   [routeLayer,markLayer,picLayer].forEach(l=>l.hide());
   if(view==='route'||view==='month'){routeLayer.show();markLayer.show();}
+  if(view==='report')pickLayer.show();else pickLayer.hide();
   if(view==='picnic')picLayer.show();
   update();$('scroll').scrollTop=0;
-  setTimeout(()=>{if(view==='picnic')M.fit(parkPts,fitPad());else if(view==='route')fitRoute();else M.fit([[BB.s,BB.w],[BB.n,BB.e]],fitPad());},280);
+  setTimeout(()=>{if(view==='picnic')M.fit(parkPts,fitPad());else if(view==='route')fitRoute();else if(view!=='settings'&&view!=='report')M.fit([[BB.s,BB.w],[BB.n,BB.e]],fitPad());},280);
 }
 window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
 // ---------- 끌어 올리는 시트 (모바일) ----------
@@ -844,14 +931,123 @@ $('geo').onclick=()=>{
     state.o=nearest(ll);state.via=[];$('inO').value='내 위치';note('');run();fitRoute();},()=>note('위치 권한을 허용해야 쓸 수 있어요.'),{enableHighAccuracy:true,timeout:10000});
 };
 
+
+// ---------- 내 숨 설정 ----------
+const store={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+const TREE_MONTHS={'양버즘나무':[4,5],'참나무':[4,5],'은행나무':[4,5],'버드나무':[3,4],'소나무':[5],'메타세쿼이아':[2,3]};
+const TIME_H={'아침':8,'낮':13,'저녁':18,'밤':21};
+let profile=store.get('soom.profile');
+function pollenMul(m){if(state.persona!=='mine'||!profile||!profile.trees.length)return 1;const ms=new Set(profile.trees.flatMap(t=>TREE_MONTHS[t]||[]));return ms.size?(ms.has(m)?1.5:0.6):1;}
+function profileWeights(p){
+  const allergic=p.resp.some(r=>r==='비염'||r==='아토피')||p.trees.length>0;
+  const w=allergic?{C:1.09,T:0.90,P:2.51}:{C:1.53,T:1.78,P:1.19};
+  if(p.resp.includes('천식')){w.C*=1.3;w.T*=1.3;}
+  return {C:+w.C.toFixed(2),T:+w.T.toFixed(2),P:+w.P.toFixed(2)};
+}
+function profileText(p){
+  const w=profileWeights(p),bits=[];
+  bits.push(p.resp.some(r=>r==='비염'||r==='아토피')||p.trees.length?'꽃가루를 크게 피해요':'설문 평균 기준으로 피해요');
+  if(p.resp.includes('천식'))bits.push('배기가스·공사 먼지를 1.3배로 봐요');
+  if(p.trees.length){const ms=[...new Set(p.trees.flatMap(t=>TREE_MONTHS[t]||[]))].sort((a,b)=>a-b);bits.push(`${p.trees.join('·')} 꽃가루 철(${ms.join('·')}월)엔 꽃가루 1.5배`);}
+  bits.push(`${p.time||'아침'} ${hourLabel(TIME_H[p.time||'아침'])} 기준, 최대 ${p.detour}분 더 걸어요`);
+  return {w,text:bits.join(' · ')};
+}
+function applyProfile(){
+  if(!profile)return;const {w,text}=profileText(profile);
+  PERSONA.mine.w=w;PERSONA.mine.note=text;state.extraMin=profile.detour;$('cap').value=profile.detour;$('oCap').textContent=profile.detour+'분';
+  if(profile.time){state.hour=TIME_H[profile.time];$('hour').value=state.hour;}
+  setPersona('mine');
+}
+function saveProfileExtra(){if(profile){profile.detour=state.extraMin;store.set('soom.profile',profile);}}
+// 칩 묶음
+function chipset(el,opts,{single=false,exclusive=null,init=[]}={}){
+  el.innerHTML=opts.map(o=>`<button type="button" aria-pressed="${init.includes(o)}">${o}</button>`).join('');
+  el.onclick=e=>{const b=e.target.closest('button');if(!b)return;const on=b.getAttribute('aria-pressed')!=='true';
+    if(single)el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+    if(exclusive&&on){if(b.textContent===exclusive)el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));else{const ex=[...el.children].find(x=>x.textContent===exclusive);if(ex)ex.setAttribute('aria-pressed','false');}}
+    b.setAttribute('aria-pressed',single?'true':String(on));el.dispatchEvent(new Event('change'));};
+  return ()=>[...el.querySelectorAll('button[aria-pressed="true"]')].map(b=>b.textContent);
+}
+// 온보딩
+const onb=$('onb');let onbPage=1,gAct,gResp,gTree,gTime,gDet;
+function openOnboarding(){
+  const p=profile||{act:[],resp:[],trees:[],time:'아침',detour:10};
+  gAct=chipset($('oAct'),['러닝','등굣길·출퇴근','산책·피크닉'],{init:p.act});
+  gResp=chipset($('oResp'),['비염','천식','아토피','해당 없음'],{exclusive:'해당 없음',init:p.resp.length?p.resp:[]});
+  gTree=chipset($('oTree'),['양버즘나무','참나무','은행나무','버드나무','소나무','메타세쿼이아','모르겠어요'],{exclusive:'모르겠어요',init:p.trees});
+  gTime=chipset($('oTime'),['아침','낮','저녁','밤'],{single:true,init:[p.time||'아침']});
+  gDet=chipset($('oDetour'),['3분','5분','10분','15분'],{single:true,init:[p.detour+'분']});
+  $('oAct').addEventListener('change',()=>{const a=gAct();const t=a.includes('등굣길·출퇴근')?'아침':a.includes('산책·피크닉')?'낮':a.includes('러닝')?'저녁':null;if(t)[...$('oTime').children].forEach(x=>x.setAttribute('aria-pressed',x.textContent===t));});
+  [$('oResp'),$('oTree'),$('oTime'),$('oDetour')].forEach(el=>el.addEventListener('change',onbPreview));
+  setOnbPage(1);onb.showModal();
+}
+function draftProfile(){return{act:gAct(),resp:gResp().filter(r=>r!=='해당 없음'),trees:gTree().filter(t=>t!=='모르겠어요'),time:gTime()[0]||'아침',detour:parseInt(gDet()[0]||'10')};}
+function onbPreview(){const {w,text}=profileText(draftProfile());$('oPreview').textContent=`${text}. (가중치 공사 ${w.C} · 교통 ${w.T} · 꽃가루 ${w.P})`;}
+function setOnbPage(n){onbPage=n;onb.querySelectorAll('.onbpage').forEach(p=>p.hidden=+p.dataset.p!==n);$('onbStep').textContent=`처음 한 번만 · ${n}/2`;$('onbBack').hidden=n===1;$('onbNext').textContent=n===1?'다음':'시작하기';if(n===2)onbPreview();}
+$('onbNext').onclick=()=>{if(onbPage===1){setOnbPage(2);return;}profile=draftProfile();store.set('soom.profile',profile);onb.close();applyProfile();update();toast('내 숨 설정을 적용했어요');};
+$('onbBack').onclick=()=>setOnbPage(1);
+$('onbSkip').onclick=()=>{onb.close();if(!profile)store.set('soom.skipped',1);};
+$('reOnboard').onclick=()=>openOnboarding();
+function renderSettings(){
+  if(!profile){$('profSummary').innerHTML='<p class="note">아직 설정하지 않았어요. 설문 응답자 평균 기준으로 보여 드리고 있어요.</p>';}
+  else{const {w,text}=profileText(profile);$('profSummary').innerHTML=`<div class="row">${[...profile.act,...profile.resp,...profile.trees].map(t=>`<span class="pill">${t}</span>`).join('')||'<span class="note">고른 항목 없음</span>'}</div><p class="note" style="color:var(--ink)">${text}</p><div class="legend"><span><span class="dot" style="background:var(--coral)"></span>공사 ${w.C}</span><span><span class="dot" style="background:var(--lav)"></span>교통 ${w.T}</span><span><span class="dot" style="background:var(--pollen)"></span>꽃가루 ${w.P}</span></div>`;}
+  $('repCount').textContent=`이 기기에 저장된 제보 ${reports.length}건 (효과가 남은 제보 ${reports.filter(r=>decay(r)>0).length}건)`;
+}
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2400);}
+
+// ---------- 숨제보 ----------
+let reports=(store.get('soom.reports')||[]),repVer=0;
+const RCAT={'내 증상':{k:'S',col:'#7e7fd0',s:'증'},'꽃가루 날림':{k:'P',col:'#c99a1c',s:'꽃'},'공사장 먼지':{k:'C',col:'#d9694a',s:'공'},'배기가스':{k:'T',col:'#5b5fc7',s:'차'}};
+const SYM_P=['재채기·콧물','눈 가려움'],SYM_T=['목 따가움','기침·숨참'];
+const SEV={'조금':1,'꽤 불편':2,'많이':3};
+const decay=r=>Math.max(0,1-(Date.now()-r.t)/(3*86400e3));
+function repFactors(r){const s=SEV[r.sev]/3*decay(r);if(r.cat==='꽃가루 날림')return{P:s};if(r.cat==='공사장 먼지')return{C:s};if(r.cat==='배기가스')return{T:s};
+  const p=r.sym.filter(x=>SYM_P.includes(x)).length,t=r.sym.filter(x=>SYM_T.includes(x)).length,n=p+t||1;return{P:s*(p||(!t?.5:0))/n,T:s*(t||(!p?.5:0))/n};}
+function applyReports(){
+  G.edges.forEach(e=>{e.Rc=e.Rt=e.Rp=0;});PIC.pts.forEach(p=>{p.Rc=p.Rt=p.Rp=0;});
+  reports.filter(r=>decay(r)>0).forEach(r=>{const f=repFactors(r),c=toM([r.lng,r.lat]);
+    G.edges.forEach(e=>{let d=1e9;for(const p of e.s){const q=Math.hypot(p[0]-c[0],p[1]-c[1]);if(q<d)d=q;}if(d>300)return;const k=Math.exp(-d/60);
+      e.Rc=Math.min(1.5,e.Rc+(f.C||0)*k);e.Rt=Math.min(1.5,e.Rt+(f.T||0)*k);e.Rp=Math.min(1.5,e.Rp+(f.P||0)*k);});
+    PIC.pts.forEach(p=>{const m=toM(p.ll),d=Math.hypot(m[0]-c[0],m[1]-c[1]);if(d>300)return;const k=Math.exp(-d/60);p.Rc+=(f.C||0)*k;p.Rt+=(f.T||0)*k;p.Rp+=(f.P||0)*k;});});
+  repVer++;picTopKey=null;netRefKey=null;
+}
+const repLayer=M.group();repLayer.show();const pickLayer=M.group();
+function drawReports(){repLayer.clear();reports.filter(r=>decay(r)>0).forEach(r=>{const c=RCAT[r.cat];repLayer.add(M.html([r.lat,r.lng],`<div class="rmark" style="background:${c.col};opacity:${.45+.55*decay(r)}" title="${r.cat} · ${r.sev}">${c.s}</div>`,'center'));});}
+let rLoc=null,gCat,gSym,gSev;
+function setRLoc(ll,label){rLoc=ll;$('rLocTxt').textContent=label;pickLayer.clear();pickLayer.add(M.html([ll[1],ll[0]],pinHtml('여','#24513a'),'bottom'));pickLayer.show();if(state.mode==='rpick'){state.mode=null;setSnap('half');$('rPick').textContent='지도에서 고르기';}}
+gCat=chipset($('rCat'),Object.keys(RCAT),{single:true,init:['내 증상']});
+gSym=chipset($('rSym'),[...SYM_P,...SYM_T],{});
+gSev=chipset($('rSev'),Object.keys(SEV),{single:true,init:['꽤 불편']});
+$('rCat').addEventListener('change',()=>{$('rSymWrap').hidden=gCat()[0]!=='내 증상';});
+$('rHere').onclick=()=>{if(!navigator.geolocation){toast('이 브라우저는 위치를 지원하지 않아요');return;}$('rLocTxt').textContent='위치 찾는 중…';
+  navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.longitude,p.coords.latitude];if(!inBox(ll,0.15)){$('rLocTxt').textContent='반포·잠원 밖이에요. 지도에서 골라 주세요';return;}setRLoc(ll,'현재 위치');M.fly([ll[1],ll[0]],16);},()=>{$('rLocTxt').textContent='위치 권한이 필요해요. 지도에서 골라 주세요';},{enableHighAccuracy:true,timeout:10000});};
+$('rPick').onclick=()=>{state.mode=state.mode==='rpick'?null:'rpick';$('rPick').textContent=state.mode?'지도를 눌러 주세요':'지도에서 고르기';if(state.mode)setSnap('peek');};
+$('rSend').onclick=()=>{
+  const cat=gCat()[0],sev=gSev()[0],sym=gSym();
+  if(!rLoc){toast('위치를 먼저 골라 주세요');return;}
+  if(cat==='내 증상'&&!sym.length){toast('어떤 증상인지 골라 주세요');return;}
+  reports.unshift({id:Date.now(),t:Date.now(),lat:rLoc[1],lng:rLoc[0],cat,sym:cat==='내 증상'?sym:[],sev,memo:$('rMemo').value.trim()});
+  reports=reports.slice(0,100);store.set('soom.reports',reports);$('rMemo').value='';rLoc=null;pickLayer.clear();$('rLocTxt').textContent='아직 안 골랐어요';
+  applyReports();update();toast('제보했어요 · 주변 길 노출에 반영돼요');
+};
+function renderReportList(){
+  const live=reports.filter(r=>decay(r)>0);
+  $('rList').innerHTML=live.length?`<h3>최근 내 제보 ${live.length}건</h3>`+live.slice(0,10).map(r=>{const c=RCAT[r.cat],ago=Math.round((Date.now()-r.t)/36e5);
+    return`<div class="rep"><span class="ic" style="background:${c.col}22;color:${c.col}">${c.s}</span><div style="flex:1;min-width:0"><b style="font-size:14px">${r.cat}${r.sym.length?' · '+r.sym.join(', '):''}</b><div class="note">${r.sev} · ${ago<1?'방금':ago<24?ago+'시간 전':Math.round(ago/24)+'일 전'}${r.memo?' · '+r.memo.replace(/[<>&]/g,''):''}</div></div><button class="x" type="button" data-del="${r.id}" aria-label="제보 지우기" style="border:0;background:none;font-size:18px;color:#8a9a91;width:36px;height:36px">×</button></div>`;}).join(''):'';
+  $('rList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{reports=reports.filter(r=>r.id!==+b.dataset.del);store.set('soom.reports',reports);applyReports();update();});
+}
+$('clearReports').onclick=()=>{reports=[];store.set('soom.reports',reports);applyReports();update();toast('제보를 모두 지웠어요');};
+
 // ---------- 시작 ----------
-computeC();drawBase();drawSites();setPersona('all');
+computeC();applyReports();drawBase();drawSites();setPersona('all');
 $('hour').value=state.hour;$('day').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.weekday));
 mEl.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.month));whenNote();
 {const po=POIS.find(p=>p[0]==='고속터미널역 (약 위치)'),pd=POIS.find(p=>p[0]==='잠원한강공원');$('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);last=plan(state.month);}
 M.init();
+applyProfile();
 setView(location.hash.slice(1));
 $('loading').remove();
+if(!profile&&!store.get('soom.skipped'))setTimeout(openOnboarding,400);
 }
 function startApp(){return new Promise((res,rej)=>{if(window.kakao&&kakao.maps&&kakao.maps.load)kakao.maps.load(()=>boot(true).then(res,rej));else boot(false).then(res,rej);});}
 startApp().catch(e=>{document.getElementById('loading').textContent='데이터를 불러오지 못했어요: '+e.message;console.error(e);});
