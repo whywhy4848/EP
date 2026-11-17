@@ -55,11 +55,12 @@ button{cursor:pointer}
 .ramplab{display:flex;justify-content:space-between;color:var(--sub);font-size:11px}
 
 /* 시트 */
-.sheet{position:fixed;z-index:700;left:0;right:0;bottom:0;background:var(--bg);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(27,43,34,.14);display:flex;flex-direction:column;max-height:62vh;transition:max-height .25s ease}
-body[data-view="home"] .sheet,body[data-view="picnic"] .sheet,body[data-view="month"] .sheet{max-height:66vh}
-.sheet.min{max-height:150px}
-.handle{border:0;background:none;padding:10px 0 4px;display:grid;place-items:center;flex:none}
-.handle span{width:40px;height:5px;border-radius:3px;background:#cfd8d2}
+.sheet{position:fixed;z-index:700;left:0;right:0;bottom:0;background:var(--bg);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(27,43,34,.14);display:flex;flex-direction:column;height:var(--sheet-h,52vh);transition:height .28s cubic-bezier(.2,.8,.2,1);touch-action:auto}
+.sheet.dragging{transition:none}
+.handle{border:0;background:none;padding:12px 0 8px;display:grid;place-items:center;flex:none;width:100%;cursor:grab;touch-action:none}
+.handle:active{cursor:grabbing}
+.handle span{width:44px;height:5px;border-radius:3px;background:#c4cfc8}
+.sheet[data-snap="peek"] .scroll{overflow:hidden}
 .scroll{overflow-y:auto;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overscroll-behavior:contain}
 .view{display:none;flex-direction:column;gap:12px}
 body[data-view="home"] .view[data-v="home"],body[data-view="route"] .view[data-v="route"],body[data-view="picnic"] .view[data-v="picnic"],body[data-view="month"] .view[data-v="month"]{display:flex}
@@ -68,8 +69,8 @@ nav.tabbar a{height:54px;display:flex;flex-direction:column;align-items:center;j
 nav.tabbar a svg{width:23px;height:23px}
 nav.tabbar a[aria-current="page"]{color:var(--forest);font-weight:700}
 @media (min-width:900px){
-  .sheet,body[data-view] .sheet{left:16px;top:16px;bottom:16px;right:auto;width:400px;max-height:none;border-radius:24px}
-  .sheet.min{max-height:none}
+  .sheet,body[data-view] .sheet{left:16px;top:16px;bottom:16px;right:auto;width:400px;height:auto;border-radius:24px}
+  .sheet[data-snap="peek"] .scroll{overflow-y:auto}
   .handle{display:none}
   .scroll{padding-top:16px}
   nav.tabbar{border-radius:0 0 24px 24px}
@@ -629,9 +630,9 @@ function showSugg(which){active=which;const q=norm($(which==='o'?'inO':'inD').va
   box.innerHTML=suggList.map((p,i)=>`<button type="button" data-i="${i}" class="${i===suggIdx?'on':''}"><span>${p[0]}</span><small>${p[1]}</small></button>`).join('');box.hidden=false;
   box.querySelectorAll('button').forEach(b=>b.onmousedown=ev=>{ev.preventDefault();pick(suggList[+b.dataset.i]);});}
 function pick(p){const which=active;$(which==='o'?'inO':'inD').value=p[0];state[which]=nearest([p[2],p[3]]);$('sugg').hidden=true;suggIdx=-1;state.via=[];
-  if(which==='o'&&state.d==null)$('inD').focus();else document.activeElement.blur();run();fitRoute();}
+  if(which==='o'&&state.d==null)$('inD').focus();else{document.activeElement.blur();setSnap('half');}run();fitRoute();}
 ['o','d'].forEach(w=>{const el=$(w==='o'?'inO':'inD');
-  el.onfocus=()=>{suggIdx=-1;showSugg(w);expandSheet();};el.oninput=()=>{suggIdx=-1;showSugg(w);};
+  el.onfocus=()=>{suggIdx=-1;showSugg(w);setSnap('full');};el.oninput=()=>{suggIdx=-1;showSugg(w);};
   el.onblur=()=>setTimeout(()=>{if(active===w)$('sugg').hidden=true;},150);
   el.onkeydown=ev=>{if($('sugg').hidden)return;if(ev.key==='ArrowDown'){suggIdx=Math.min(suggList.length-1,suggIdx+1);showSugg(w);ev.preventDefault();}
     else if(ev.key==='ArrowUp'){suggIdx=Math.max(0,suggIdx-1);showSugg(w);ev.preventDefault();}
@@ -738,7 +739,7 @@ let view='home';
 function update(){renderCond();drawNet();if(view==='route')run();else if(view==='picnic')drawPicnic();else if(view==='month'){monthChart();picChart();}else renderHome();}
 const parkBounds=L.latLngBounds(PIC.pts.map(p=>[p.ll[1],p.ll[0]]));
 function setView(v){
-  view=['route','picnic','month'].includes(v)?v:'home';document.body.dataset.view=view;expandSheet();
+  view=['route','picnic','month'].includes(v)?v:'home';document.body.dataset.view=view;setSnap('half');
   document.querySelectorAll('.tabbar a').forEach(a=>{if(a.dataset.tab===view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   [routeLayer,markLayer,picLayer].forEach(l=>map.removeLayer(l));
   if(view==='route'||view==='month'){routeLayer.addTo(map);markLayer.addTo(map);}
@@ -747,9 +748,36 @@ function setView(v){
   setTimeout(()=>{if(view==='picnic')map.fitBounds(parkBounds,{...fitPad()});else if(view==='route')fitRoute();else map.fitBounds(bounds,{...fitPad()});},280);
 }
 window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
-function expandSheet(){$('sheet').classList.remove('min');}
-function collapseSheet(){if(window.innerWidth<900)$('sheet').classList.add('min');}
-$('handle').onclick=()=>$('sheet').classList.toggle('min');
+// ---------- 끌어 올리는 시트 (모바일) ----------
+const sheet=$('sheet');
+const isMobile=()=>window.innerWidth<900;
+const SNAP={peek:()=>Math.min(170,window.innerHeight*.26),half:()=>Math.round(window.innerHeight*.52),full:()=>window.innerHeight-76};
+let snap='half';
+function setSnap(s){if(!isMobile())return;snap=s;sheet.dataset.snap=s;sheet.style.setProperty('--sheet-h',SNAP[s]()+'px');}
+function expandSheet(){if(isMobile()&&snap==='peek')setSnap('half');}
+function collapseSheet(){setSnap('peek');}
+(()=>{let y0=0,h0=0,t0=0,moved=false,id=null;
+  const down=e=>{if(!isMobile())return;id=e.pointerId;y0=e.clientY;h0=sheet.getBoundingClientRect().height;t0=performance.now();moved=false;sheet.classList.add('dragging');e.currentTarget.setPointerCapture(id);};
+  const move=e=>{if(e.pointerId!==id)return;const dy=e.clientY-y0;if(Math.abs(dy)>4)moved=true;const h=Math.max(SNAP.peek()-30,Math.min(SNAP.full()+20,h0-dy));sheet.style.setProperty('--sheet-h',h+'px');};
+  const up=e=>{if(e.pointerId!==id)return;id=null;sheet.classList.remove('dragging');
+    const h=sheet.getBoundingClientRect().height,v=(e.clientY-y0)/Math.max(1,performance.now()-t0); // px/ms, 아래로 +
+    if(!moved){setSnap(snap==='peek'?'half':snap==='half'?'full':'peek');return;}
+    const order=['peek','half','full'];
+    if(Math.abs(v)>0.5&&Math.abs(h-SNAP[snap]())<120){const i=order.indexOf(snap);setSnap(order[Math.max(0,Math.min(2,i+(v>0?-1:1)))]);}
+    else setSnap(nearestSnap(h));};
+  const nearestSnap=h=>['peek','half','full'].reduce((a,b)=>Math.abs(SNAP[b]()-h)<Math.abs(SNAP[a]()-h)?b:a);
+  const hd=$('handle');hd.addEventListener('pointerdown',down);hd.addEventListener('pointermove',move);hd.addEventListener('pointerup',up);hd.addEventListener('pointercancel',up);
+  hd.onkeydown=e=>{if(e.key==='ArrowUp'){setSnap(snap==='peek'?'half':'full');e.preventDefault();}if(e.key==='ArrowDown'){setSnap(snap==='full'?'half':'peek');e.preventDefault();}};
+  // 시트 내용이 맨 위일 때 아래로 끌면 시트가 내려가게
+  const sc=$('scroll');let sy=null,sh0=0;
+  sc.addEventListener('touchstart',e=>{if(!isMobile()||sc.scrollTop>0){sy=null;return;}sy=e.touches[0].clientY;sh0=sheet.getBoundingClientRect().height;},{passive:true});
+  sc.addEventListener('touchmove',e=>{if(sy===null)return;const dy=e.touches[0].clientY-sy;if(dy>8&&sc.scrollTop<=0){sheet.classList.add('dragging');sheet.style.setProperty('--sheet-h',Math.max(SNAP.peek()-30,sh0-dy)+'px');}},{passive:true});
+  sc.addEventListener('touchend',()=>{if(sy===null)return;sy=null;if(sheet.classList.contains('dragging')){sheet.classList.remove('dragging');const h=sheet.getBoundingClientRect().height;setSnap(h<SNAP.half()-60?'peek':'half');}});
+  window.addEventListener('resize',()=>{if(isMobile())setSnap(snap);else sheet.style.removeProperty('--sheet-h');});
+  // 지도를 만지면 시트를 내려서 지도를 넓게
+  map.on('dragstart',()=>{if(isMobile()&&snap!=='peek')setSnap('peek');});
+})();
+setSnap('half');
 
 // ---------- 재생 ----------
 let timer=null;
