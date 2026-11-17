@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>숨쉬는 반포길 · 반포·잠원 저노출 보행</title>
+<meta name="description" content="반포·잠원에서 공사 먼지·배기가스·꽃가루 노출이 적은 보행경로와 한강공원 피크닉 자리를 찾아주는 지도">
+<meta name="theme-color" content="#0f8a7e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* 길찾기 앱 구조: 왼쪽 검색·결과 패널, 오른쪽 지도. 일반 경로 = 회색 점선, 저노출 우회 = 청록 */
+:root{
+  --bg:#f3f5f2; --panel:#ffffff; --ink:#1b2420; --muted:#5d6b64; --line:#d9dfdb; --soft:#eef2ef;
+  --land:#e7ece8; --water:#c9dbe6; --park:#d5e6cf; --net:#b8c2bc;
+  --r-gen:#59645e; --r-clean:#0f8a7e; --o:#0f8a7e; --d:#c2412d;
+  --c-con:#c2552d; --c-traf:#5b5fc7; --c-pol:#9a8a12;
+  --accent:#0f8a7e;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121715; --panel:#1a211e; --ink:#e4ebe7; --muted:#9aa8a1; --line:#2c3632; --soft:#222b27;
+  --land:#1f2724; --water:#1d3340; --park:#21352a; --net:#3e4a45;
+  --r-gen:#aab5af; --r-clean:#33c2b3; --o:#33c2b3; --d:#ee6a52; --accent:#33c2b3;
+  --c-con:#e2784f; --c-traf:#8d91ee; --c-pol:#cdbb3a; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#121715; --panel:#1a211e; --ink:#e4ebe7; --muted:#9aa8a1; --line:#2c3632; --soft:#222b27;
+  --land:#1f2724; --water:#1d3340; --park:#21352a; --net:#3e4a45;
+  --r-gen:#aab5af; --r-clean:#33c2b3; --o:#33c2b3; --d:#ee6a52; --accent:#33c2b3;
+  --c-con:#e2784f; --c-traf:#8d91ee; --c-pol:#cdbb3a; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);display:grid;grid-template-columns:380px 1fr}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+.blk{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+h1{font-size:18px;margin:0;font-weight:700;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+h2{font-size:12px;font-weight:700;color:var(--muted);margin:0}
+/* 검색 */
+.od{display:grid;grid-template-columns:1fr 36px;gap:8px;align-items:center}
+.fields{display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:9px;overflow:visible;position:relative}
+.field{position:relative;display:flex;align-items:center;gap:8px;padding:0 10px}
+.field+.field{border-top:1px solid var(--line)}
+.field .pin{width:10px;height:10px;border-radius:50%;flex:none}
+.field input{flex:1;border:0;background:transparent;color:var(--ink);font:inherit;padding:10px 0;min-width:0}
+.field input:focus{outline:none}
+.field:focus-within{background:var(--soft)}
+.field .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:15px;padding:4px}
+.swap{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;height:36px;cursor:pointer;font-size:16px}
+.sugg{position:absolute;left:0;right:0;top:100%;z-index:1000;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:260px;overflow-y:auto;margin-top:4px}
+.sugg button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;color:var(--ink);font:inherit;padding:8px 12px;cursor:pointer}
+.sugg button:hover,.sugg button.on{background:var(--soft)}
+.sugg small{color:var(--muted);font-size:11.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.chip:hover{border-color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 월 */
+.months{display:grid;grid-template-columns:repeat(12,1fr);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.months button{border:0;border-right:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12px;padding:6px 0;cursor:pointer;position:relative}
+.months button:last-child{border-right:0}
+.months button[aria-pressed="true"]{background:var(--ink);color:var(--panel);font-weight:500}
+.months button .pd{position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--c-pol)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12.5px;padding:6px 12px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel);font-weight:500}
+select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.play{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.play[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.note{font-size:12px;color:var(--muted);margin:0}
+/* 결과 카드 */
+.cards{display:flex;flex-direction:column;gap:8px}
+.card{border:1px solid var(--line);border-radius:9px;padding:11px 12px 10px;display:grid;gap:6px;cursor:pointer;background:var(--panel);position:relative}
+.card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--c)}
+.card[aria-pressed="false"]{opacity:.45}
+.card .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card .lab{font-weight:700;font-size:14px}
+.card .lab small{font-weight:400;color:var(--muted);font-size:12px;margin-left:4px}
+.card .time{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .time small{font-size:12.5px;font-weight:400;color:var(--muted);margin-left:4px}
+.meta{font-family:var(--f-num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-family:var(--f-body);font-size:12px;font-weight:500;padding:1px 8px;border-radius:999px;background:var(--soft)}
+.pill.good{background:color-mix(in srgb,var(--r-clean) 16%,transparent);color:var(--r-clean)}
+.bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--land)}
+.bar span{display:block;height:100%}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.linkbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 11px;color:var(--ink);text-decoration:none;font-size:13px;background:var(--panel)}
+.linkbtn:hover{border-color:var(--ink)}
+.linkbtn .n{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;background:#03c75a;color:#fff;font-weight:700;font-size:12px}
+.btn{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:6px 10px;cursor:pointer}
+.btn[aria-pressed="true"]{border-color:var(--d);color:var(--d);font-weight:500}
+/* 월별 차트 */
+#mchart svg{display:block;width:100%;height:auto}
+#mchart text{fill:var(--muted);font:11px var(--f-body)}
+#mchart .val{fill:var(--ink);font:500 10.5px var(--f-num)}
+#mchart .hit{cursor:pointer;fill:transparent}
+#mchart .hit:hover{fill:var(--soft)}
+.slider{display:grid;grid-template-columns:76px 1fr 34px;gap:8px;align-items:center;font-size:13px}
+.slider input{width:100%;accent-color:var(--ink)}
+.slider output{font-family:var(--f-num);font-size:12px;text-align:right}
+details summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+details[open] summary{margin-bottom:8px}
+details p{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+main{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:var(--water)}
+.leaflet-container{font:inherit;background:var(--water)}
+.mapbar{position:absolute;top:12px;right:12px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:12px;width:200px}
+.mapbar .big{font-size:15px;font-weight:700}
+.ramp{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--net),#f0c24a,#e0662e,#a3122a)}
+.ramplab{display:flex;justify-content:space-between;color:var(--muted);font-size:11px}
+.pop{display:flex;gap:6px}
+.pop button{font:inherit;font-size:12.5px;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;color:#fff}
+.leaflet-popup-content{margin:10px 12px}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--ink)}
+.pmark{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid var(--panel);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.pmark span{transform:rotate(45deg);color:#fff;font-weight:700;font-size:12px}
+.vmark{width:16px;height:16px;border-radius:50%;background:var(--panel);border:3px solid var(--r-gen);display:grid;place-items:center;font:700 9px var(--f-num);color:var(--ink)}
+@media (max-width:760px){
+  body{grid-template-columns:1fr;grid-template-rows:50% 50%}
+  main{grid-row:1} aside{grid-row:2;border-right:0;border-top:1px solid var(--line)}
+  .mapbar{width:160px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---- 플랫폼 추가 스타일 ---- */
+.top{padding:14px 18px 0;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--r-clean);display:grid;place-items:center;flex:none}
+.brand .logo svg{width:18px;height:18px}
+.tabs{display:flex;gap:0;margin:0 -18px;padding:0 18px}
+.tabs a{flex:1;text-align:center;padding:9px 0 10px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:2.5px solid transparent}
+.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--ink)}
+[data-tab]{display:none}
+body[data-view="route"] [data-tab~="route"],body[data-view="picnic"] [data-tab~="picnic"]{display:flex}
+.spot{border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:grid;gap:6px;background:var(--panel)}
+.spot .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.spot b{font-size:14px}
+.score{font-family:var(--f-num);font-size:12.5px;padding:1px 8px;border-radius:999px;font-variant-numeric:tabular-nums}
+.spot .why{font-size:12.5px;color:var(--muted)}
+.spot .acts{display:flex;gap:6px;flex-wrap:wrap}
+.rank{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--r-clean);color:#fff;font:700 11px var(--f-num);margin-right:6px}
+.rank.bad{background:var(--d)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:3000;color:var(--muted);font-size:14px}
+.leaflet-control-attribution{font-size:10.5px}
+.foot{padding:12px 18px 20px;font-size:11.5px;color:var(--muted)}
+.foot a{color:inherit}
+</style>
+</head>
+<body data-view="route">
+<div class="loading" id="loading">지도 데이터 불러오는 중…</div>
+<aside>
+  <div class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c3-1 3-6 7-7s4-6 7-7"/><circle cx="5" cy="19" r="1.6" fill="#fff"/><circle cx="19" cy="5" r="1.6" fill="#fff"/></svg></div>
+      <div><h1>숨쉬는 반포길</h1><p class="sub" style="margin:0">반포·잠원 저노출 보행 플랫폼</p></div>
+    </div>
+    <nav class="tabs" aria-label="기능">
+      <a href="#route" id="tabRoute">길찾기</a>
+      <a href="#picnic" id="tabPicnic">피크닉 장소</a>
+    </nav>
+  </div>
+
+  <!-- 길찾기: 검색 -->
+  <div class="blk" data-tab="route">
+    <div class="od">
+      <div class="fields">
+        <div class="field"><span class="pin" style="background:var(--o)"></span><input id="inO" placeholder="출발지 검색 또는 지도 클릭" autocomplete="off" aria-label="출발지"><button class="x" data-x="o" aria-label="출발지 지우기">×</button></div>
+        <div class="field"><span class="pin" style="background:var(--d)"></span><input id="inD" placeholder="도착지 검색 또는 지도 클릭" autocomplete="off" aria-label="도착지"><button class="x" data-x="d" aria-label="도착지 지우기">×</button></div>
+        <div class="sugg" id="sugg" hidden></div>
+      </div>
+      <button class="swap" id="swap" type="button" aria-label="출발·도착 바꾸기" title="출발·도착 바꾸기">⇅</button>
+    </div>
+    <div class="row"><button class="btn" id="geo" type="button">◎ 내 위치에서 출발</button><span class="note" id="geoNote"></span></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <!-- 공통: 언제 -->
+  <div class="blk" data-tab="route picnic">
+    <div class="row" style="justify-content:space-between"><h2>언제</h2><button class="play" id="play" type="button" aria-pressed="false">▶ 1–12월 재생</button></div>
+    <div class="months" id="months" role="group" aria-label="월"></div>
+    <div class="row">
+      <div class="seg" id="day" role="group" aria-label="요일"><button type="button" data-v="1" aria-pressed="true">평일</button><button type="button" data-v="0" aria-pressed="false">주말</button></div>
+      <select id="hour" aria-label="시간"></select>
+    </div>
+    <p class="note" id="whenNote"></p>
+  </div>
+
+  <!-- 공통: 누구 기준 -->
+  <div class="blk" data-tab="route picnic">
+    <h2>누구 기준으로 피할까 <span style="font-weight:400">· 우리 설문 56명</span></h2>
+    <div class="seg" id="persona" role="group" aria-label="가중치 기준">
+      <button type="button" data-v="all" aria-pressed="true">전체 응답자</button>
+      <button type="button" data-v="alg" aria-pressed="false">꽃가루 알레르기</button>
+      <button type="button" data-v="custom" aria-pressed="false">직접 조정</button>
+    </div>
+    <div id="wview" class="legend" style="font-size:12.5px"></div>
+    <p class="note" id="pnote"></p>
+    <details id="wdetails">
+      <summary>가중치 직접 조정 · 우회 허용 범위</summary>
+      <div class="slider"><label for="wC"><span class="dot" style="background:var(--c-con)"></span>공사장</label><input type="range" id="wC" min="0" max="4" step="0.1" value="1.53"><output id="oC">1.5</output></div>
+      <div class="slider"><label for="wT"><span class="dot" style="background:var(--c-traf)"></span>교통배기</label><input type="range" id="wT" min="0" max="4" step="0.1" value="1.78"><output id="oT">1.8</output></div>
+      <div class="slider"><label for="wP"><span class="dot" style="background:var(--c-pol)"></span>꽃가루</label><input type="range" id="wP" min="0" max="4" step="0.1" value="1.19"><output id="oP">1.2</output></div>
+      <div class="slider"><label for="cap">우회 허용</label><input type="range" id="cap" min="1.1" max="1.6" step="0.05" value="1.3"><output id="oCap">1.30</output></div>
+      <p class="note">우회 허용 1.30 = 일반 경로보다 최대 30% 더 걷는 범위에서 노출이 가장 적은 길. 슬라이더를 움직이면 '직접 조정'으로 바뀌어.</p>
+      <div class="row" style="margin-top:6px"><button class="btn" id="addSite" type="button" aria-pressed="false">＋ 공사장 찍기</button><button class="btn" id="clearSites" type="button">추가한 공사장 지우기</button></div>
+      <p class="note" id="siteNote"></p>
+    </details>
+  </div>
+
+  <!-- 길찾기: 결과 -->
+  <div class="blk" data-tab="route">
+    <h2 id="resTitle">도보 경로</h2>
+    <div class="cards" id="cards"></div>
+    <div class="row"><a class="linkbtn" id="naver" href="#" target="_blank" rel="noopener"><span class="n">N</span>네이버 지도 도보 길찾기 열기</a></div>
+    <div class="row">
+      <button class="btn" id="viaBtn" type="button" aria-pressed="false">경유지 찍어 네이버 경로 맞추기</button>
+      <button class="btn" id="viaClear" type="button" hidden>경유지 지우기</button>
+    </div>
+    <p class="note" id="viaNote">네이버 경로가 우리 '일반 경로'와 다르면, 경유지를 찍어 똑같이 만든 뒤 노출을 비교할 수 있어.</p>
+  </div>
+  <div class="blk" data-tab="route">
+    <h2>월별 노출 비교 <span style="font-weight:400">· 이 경로, 같은 요일·시간 기준</span></h2>
+    <div id="mchart"></div>
+    <div class="legend"><span><span class="dot" style="background:var(--r-gen)"></span>일반 경로</span><span><span class="dot" style="background:var(--r-clean)"></span>저노출 우회</span><span>막대를 누르면 그 달로 바뀌어</span></div>
+  </div>
+
+  <!-- 피크닉 -->
+  <div class="blk" data-tab="picnic">
+    <h2 id="picTitle">추천 피크닉 장소</h2>
+    <p class="note">반포·잠원 한강공원 안을 40m 간격으로 나눠, 지금 고른 달·시간·기준에서 공사·배기가스·꽃가루 노출이 적은 곳을 골랐어. 위험도 0–100 (낮을수록 좋음).</p>
+    <div class="cards" id="spots"></div>
+  </div>
+  <div class="blk" data-tab="picnic">
+    <h2>몇 월에 가면 좋을까 <span style="font-weight:400">· 같은 요일·시간 기준</span></h2>
+    <div id="pchart"></div>
+    <div class="legend"><span><span class="dot" style="background:var(--r-gen)"></span>공원 평균</span><span><span class="dot" style="background:var(--r-clean)"></span>가장 좋은 자리</span><span>막대를 누르면 그 달로 바뀌어</span></div>
+  </div>
+
+  <div class="blk" data-tab="route picnic">
+    <details>
+      <summary>계산 방식과 데이터</summary>
+      <p><b>일반 경로</b>는 보행망 위 최단거리 경로야. 네이버 도보 길찾기도 기본은 최단·최소시간이라 비슷하지만 똑같진 않아. 네이버는 도보 경로 API를 공개하지 않아서, 버튼으로 열어 보고 경유지로 맞추는 방식이야.</p>
+      <p><b>저노출 우회</b>는 링크 비용 = 길이 × (1 + 가중치 × 노출)인 최단경로. 가중치 배율을 0~16배로 바꿔 찾은 후보 중 우회 허용 안에서 노출이 가장 적은 것.</p>
+      <p><b>노출</b> 공사장 exp(−거리/75m), 평일 7–18시 작업 가정(그 외 0.15). 교통배기 간선 등급 가중 × exp(−거리/50m), 출퇴근 ×1.3. 꽃가루 그 달 비산 수목(위험도 상 1, 중 0.5) 커널합 exp(−거리/30m). 건물 안 링크는 20%.</p>
+      <p><b>피크닉 위험도</b> 같은 식을 공원 격자점에 적용. 한강공원 안은 수목 자료가 없어서 한강생태지도(2022)의 수변 버드나무류 우점 정보를 바탕으로 3–4월 물가 꽃가루를 0.6 × exp(−물가 거리/40m)로 추정해 더했어.</p>
+      <p><b>가중치</b> 우리 설문(2026.9.30–10.1, 56명). 요인별 경험 빈도(0–3) × 불편 점수(1–5) 평균, 세 요인 합 4.5. 전체: 공사 1.53 · 교통 1.78 · 꽃가루 1.19. 꽃가루 알레르기(꽃가루 불편 4–5점, 14명): 1.09 · 0.90 · 2.51. 응답자가 20대에 몰려 있고 대상지 거주자는 적어 대표성 한계가 있어. 황사·미세먼지는 동네 안에서 경로마다 거의 같아서 넣지 않았어.</p>
+      <p><b>데이터</b> 서울시 자치구별 도보 네트워크(서초구, 2026.11.17), 서울시 가로수·공원 및 사유지 수목 위치(5,502그루). 한강공원 산책로·간선도로·공사구역·장소는 OpenStreetMap(2026.11). 역 위치는 대략값.</p>
+    </details>
+  </div>
+  <div class="foot">연세대 도시공학과 CRP2340 환경계획 팀 프로젝트 · 2026 · 연구용 프로토타입이라 실제 대기질 측정값과 다를 수 있어요.</div>
+</aside>
+
+<main>
+  <div id="map" role="application" aria-label="지도"></div>
+  <div class="mapbar">
+    <div class="big" id="mapMonth"></div>
+    <label for="layer" id="layerLab">링크 색: 미터당 노출</label>
+    <select id="layer"><option value="sum">가중 합계</option><option value="C">공사장</option><option value="T">교통배기</option><option value="P">꽃가루</option><option value="none">끄기</option></select>
+    <div class="ramp"></div>
+    <div class="ramplab"><span>낮음</span><span>높음</span></div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+async function boot(){
+const [G,POIS,PIC]=await Promise.all(['data/graph.json','data/pois.json','data/picnic.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json();})));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+
+// ---------- 좌표 ----------
+const LAT0=37.51, KX=111320*Math.cos(LAT0*Math.PI/180), KY=110540;
+const toM=([lon,lat])=>[lon*KX,lat*KY];
+G.edges.forEach(e=>{const pts=[],g=e.g.map(toM);for(let i=0;i<g.length-1;i++){const[x1,y1]=g[i],[x2,y2]=g[i+1];const n=Math.max(1,Math.ceil(Math.hypot(x2-x1,y2-y1)/12));for(let j=0;j<n;j++)pts.push([x1+(x2-x1)*j/n,y1+(y2-y1)*j/n]);}pts.push(g[g.length-1]);e.s=pts;});
+
+// ---------- 공사장 ----------
+const osmSites=G.sites.map(s=>({kind:'poly',name:s.name,ll:s.ll,m:s.ll.map(toM)}));
+let userSites=[];
+function segDist(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);}
+function inPoly(p,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const[xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>p[1])!==(yj>p[1]))&&(p[0]<(xj-xi)*(p[1]-yi)/(yj-yi)+xi))c=!c;}return c;}
+function siteDist(p,s){if(s.kind==='circle')return Math.max(0,Math.hypot(p[0]-s.m[0],p[1]-s.m[1])-s.r);if(inPoly(p,s.m))return 0;let d=1e9;for(let i=0;i<s.m.length-1;i++)d=Math.min(d,segDist(p,s.m[i],s.m[i+1]));return d;}
+function computeC(){const sites=[...osmSites,...userSites];G.edges.forEach(e=>{let sum=0;for(const p of e.s){let mx=0;for(const s of sites){const d=siteDist(p,s);if(d<400)mx=Math.max(mx,Math.exp(-d/75));}sum+=mx;}e.C=sum/e.s.length*(e.hw==='indoor'?0.2:1);});}
+
+// ---------- 상태 ----------
+const MONTHS=G.months;
+const now=new Date();
+const state={month:now.getMonth()+1,hour:8,weekday:1,w:{C:1.53,T:1.78,P:1.19},cap:1.3,persona:'all',
+  o:null,d:null,via:[],show:{gen:true,clean:true},mode:null,layer:'sum'};
+function expoAt(e,month){
+  const cOn=(state.weekday&&state.hour>=7&&state.hour<18)?1:0.15;
+  const peak=[7,8,17,18,19].includes(state.hour)?1.3:1;
+  const mi=MONTHS.indexOf(month);
+  return {C:e.C*cOn,T:e.T*peak,P:mi>=0?e.P[mi]:0};
+}
+
+// ---------- 그래프 ----------
+const adj=G.nodes.map(()=>[]);
+G.edges.forEach((e,i)=>{adj[e.u].push([e.v,i]);adj[e.v].push([e.u,i]);});
+function dijkstra(o,d,cost){
+  if(o===d) return [];
+  const n=G.nodes.length,dist=new Float64Array(n).fill(Infinity),prev=new Int32Array(n).fill(-1),pe=new Int32Array(n).fill(-1);
+  const h=[];const push=(k,v)=>{h.push([k,v]);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;[h[p],h[i]]=[h[i],h[p]];i=p;}};
+  const pop=()=>{const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m;}}return t;};
+  dist[o]=0;push(0,o);
+  while(h.length){const[du,u]=pop();if(du>dist[u])continue;if(u===d)break;for(const[v,ei]of adj[u]){const nd=du+cost[ei];if(nd<dist[v]){dist[v]=nd;prev[v]=u;pe[v]=ei;push(nd,v);}}}
+  if(!isFinite(dist[d]))return null;
+  const out=[];for(let v=d;v!==o;v=prev[v])out.push(pe[v]);return out.reverse();
+}
+const LEN=G.edges.map(e=>e.len);
+function summarize(edges,month){let L=0;const parts={C:0,T:0,P:0};edges.forEach(i=>{const e=G.edges[i],x=expoAt(e,month);L+=e.len;for(const k in parts)parts[k]+=e.len*x[k];});return {edges,L,parts,ex:state.w.C*parts.C+state.w.T*parts.T+state.w.P*parts.P};}
+function generalRoute(){ // 최단 (경유지 있으면 경유지 순서대로)
+  const seq=[state.o,...state.via.map(v=>v.node),state.d];let all=[];
+  for(let i=0;i<seq.length-1;i++){const p=dijkstra(seq[i],seq[i+1],LEN);if(!p)return null;all=all.concat(p);}
+  return all;
+}
+let siteVer=0;const planCache=new Map();
+function plan(month){
+  const key=[month,state.o,state.d,state.via.map(v=>v.node).join('-'),state.w.C,state.w.T,state.w.P,state.cap,state.hour,state.weekday,siteVer].join('|');
+  if(planCache.has(key))return planCache.get(key);
+  const r=planRaw(month);planCache.set(key,r);return r;
+}
+function planRaw(month){
+  const gen=generalRoute(); if(!gen) return null;
+  const g=summarize(gen,month);
+  const X=G.edges.map(e=>expoAt(e,month));
+  let best=null; const Lsp=summarize(dijkstra(state.o,state.d,LEN),month).L;
+  for(const k of [0,0.25,0.5,1,2,4,8,16]){
+    const cost=G.edges.map((e,i)=>e.len*(1+k*(state.w.C*X[i].C+state.w.T*X[i].T+state.w.P*X[i].P)));
+    const p=dijkstra(state.o,state.d,cost); if(!p) continue;
+    const s=summarize(p,month);
+    if(s.L<=state.cap*Math.max(Lsp,g.L)+1e-6 && (!best||s.ex<best.ex-1e-9||(Math.abs(s.ex-best.ex)<1e-9&&s.L<best.L))) best=s;
+  }
+  if(!best||best.ex>=g.ex) best=g; // 일반 경로보다 나쁘면 그대로
+  return {gen:g,clean:best};
+}
+
+// ---------- 지도 ----------
+const map=L.map('map',{zoomControl:true,attributionControl:true,preferCanvas:true,zoomSnap:0.25,minZoom:13,maxZoom:18});
+const renderer=L.canvas({padding:.4});
+const bounds=L.latLngBounds(G.nodes.map(([x,y])=>[y,x]));
+map.fitBounds(bounds.pad(0.02));map.setMaxBounds(bounds.pad(0.4));
+map.attributionControl.setPrefix(false).addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 서울 열린데이터광장');
+const base=L.layerGroup().addTo(map),netLayer=L.layerGroup().addTo(map),siteLayer=L.layerGroup().addTo(map),routeLayer=L.layerGroup().addTo(map),markLayer=L.layerGroup().addTo(map);
+function drawBase(){
+  base.clearLayers();
+  L.geoJSON({type:'Feature',geometry:G.river},{renderer,interactive:false,style:{stroke:false,fillColor:css('--water'),fillOpacity:1}}).addTo(base);
+  Object.values(G.dongs).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer,interactive:false,style:{color:css('--muted'),weight:.8,dashArray:'3 4',fillColor:css('--land'),fillOpacity:1}}).addTo(base));
+  Object.values(G.parks).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer,interactive:false,style:{stroke:false,fillColor:css('--park'),fillOpacity:1}}).addTo(base));
+}
+function ramp(t){const stops=[[0,css('--net')],[.35,'#f0c24a'],[.7,'#e0662e'],[1,'#a3122a']];const hex=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.substr(i,2),16));};t=Math.max(0,Math.min(1,t));let i=0;while(i<stops.length-2&&t>stops[i+1][0])i++;const[a,ca]=stops[i],[b,cb]=stops[i+1];const f=(t-a)/(b-a),A=hex(ca),B=hex(cb);return`rgb(${A.map((v,j)=>Math.round(v+(B[j]-v)*f)).join(',')})`;}
+let netTop=null;
+function drawNet(){
+  netLayer.clearLayers();const lay=state.layer;
+  const val=e=>{const x=expoAt(e,state.month);if(lay==='sum')return state.w.C*x.C+state.w.T*x.T+state.w.P*x.P;if(lay==='none')return 0;return x[lay];};
+  // 색 기준은 연중 최댓값 기준 고정 → 월별로 바꿔도 비교 가능
+  const ref=[];G.edges.forEach(e=>MONTHS.concat([11]).forEach(m=>{const x=expoAt(e,m);ref.push(lay==='sum'?state.w.C*x.C+state.w.T*x.T+state.w.P*x.P:lay==='none'?0:x[lay]);}));
+  ref.sort((a,b)=>a-b);const top=ref[Math.floor(ref.length*.97)]||1;
+  G.edges.forEach(e=>L.polyline(e.g.map(([x,y])=>[y,x]),{renderer,interactive:false,color:lay==='none'?css('--net'):ramp(val(e)/top),weight:e.hw==='shared'?2.2:1.6,opacity:.9,dashArray:e.hw==='indoor'?'2 3':null}).addTo(netLayer));
+}
+function drawSites(){
+  siteLayer.clearLayers();const col=css('--c-con');
+  osmSites.forEach(s=>L.polygon(s.ll.map(([x,y])=>[y,x]),{renderer,color:col,weight:1.5,fillColor:col,fillOpacity:.25,dashArray:'4 3'}).bindTooltip(s.name+' (OSM)').addTo(siteLayer));
+  userSites.forEach((s,i)=>L.circle([s.ll[1],s.ll[0]],{renderer,radius:s.r,color:col,weight:2,fillColor:col,fillOpacity:.3}).bindTooltip('직접 추가한 공사장 · 클릭하면 삭제').on('click',ev=>{L.DomEvent.stop(ev);userSites.splice(i,1);refreshSites();}).addTo(siteLayer));
+  $('siteNote').textContent=`OSM 공사구역 ${osmSites.length}곳 + 직접 추가 ${userSites.length}곳. 구반포역 재건축처럼 OSM에 없는 현장은 직접 찍어줘.`;
+}
+function pinIcon(lab,col){return L.divIcon({className:'',html:`<div class="pmark" style="background:${col}"><span>${lab}</span></div>`,iconSize:[26,26],iconAnchor:[13,30]});}
+function drawMarks(){
+  markLayer.clearLayers();
+  if(state.o!=null){const[x,y]=G.nodes[state.o];L.marker([y,x],{icon:pinIcon('출',css('--o')),keyboard:false}).addTo(markLayer);}
+  if(state.d!=null){const[x,y]=G.nodes[state.d];L.marker([y,x],{icon:pinIcon('도',css('--d')),keyboard:false}).addTo(markLayer);}
+  state.via.forEach((v,i)=>{const[x,y]=G.nodes[v.node];L.marker([y,x],{icon:L.divIcon({className:'',html:`<div class="vmark">${i+1}</div>`,iconSize:[16,16],iconAnchor:[8,8]})}).bindTooltip('경유지 '+(i+1)+' · 클릭하면 삭제').on('click',ev=>{L.DomEvent.stop(ev);state.via.splice(i,1);run();}).addTo(markLayer);});
+}
+function lineOf(edges){const ll=[];edges.forEach(i=>{let g=G.edges[i].g.map(([x,y])=>[y,x]);if(ll.length){const lp=ll[ll.length-1];if(Math.hypot(lp[0]-g[g.length-1][0],lp[1]-g[g.length-1][1])<Math.hypot(lp[0]-g[0][0],lp[1]-g[0][1]))g=g.reverse();}ll.push(...g);});return ll;}
+
+// ---------- 결과 ----------
+let last=null;
+const fmtM=m=>m>=1000?(m/1000).toFixed(2)+'km':Math.round(m)+'m';
+const mins=m=>Math.max(1,Math.round(m/1.2/60)); // 보행속도 1.2m/s
+function run(){
+  routeLayer.clearLayers();drawMarks();naverLink();
+  const cards=$('cards');
+  $('viaClear').hidden=!state.via.length;
+  if(state.o==null||state.d==null){cards.innerHTML='<p class="note">출발지와 도착지를 검색하거나 지도에서 골라줘.</p>';$('mchart').innerHTML='';$('resTitle').textContent='도보 경로';return;}
+  last=plan(state.month);
+  if(!last){cards.innerHTML='<p class="note">두 지점이 연결되지 않아. 다른 곳을 골라줘.</p>';return;}
+  const g=last.gen,c=last.clean,same=c.edges.join()===g.edges.join()||c.ex>=g.ex*0.995;
+  $('resTitle').textContent=`${state.month}월 ${state.weekday?'평일':'주말'} ${state.hour}시 도보 경로`;
+  if(state.show.gen){const ll=lineOf(g.edges);L.polyline(ll,{renderer,color:css('--panel'),weight:7,opacity:.9}).addTo(routeLayer);L.polyline(ll,{renderer,color:css('--r-gen'),weight:4,dashArray:'8 6'}).addTo(routeLayer);}
+  if(state.show.clean&&!same){const ll=lineOf(c.edges);L.polyline(ll,{renderer,color:css('--panel'),weight:10,opacity:.9}).addTo(routeLayer);L.polyline(ll,{renderer,color:css('--r-clean'),weight:6}).addTo(routeLayer);}
+  const mx=Math.max(g.ex,c.ex,1e-9);
+  const bar=r=>`<div class="bar" aria-hidden="true">${['C','T','P'].map(x=>`<span style="width:${state.w[x]*r.parts[x]/mx*100}%;background:var(${x==='C'?'--c-con':x==='T'?'--c-traf':'--c-pol'})"></span>`).join('')}</div>`;
+  const de=g.ex>0?(c.ex/g.ex-1)*100:0, dl=(c.L/g.L-1)*100;
+  const genLab=state.via.length?`일반 경로 <small>경유지 ${state.via.length}개 반영</small>`:'일반 경로 <small>최단거리 · 네이버식</small>';
+  cards.innerHTML=`
+  <div class="card" style="--c:var(--r-gen)" role="button" tabindex="0" data-k="gen" aria-pressed="${state.show.gen}">
+    <div class="t"><span class="lab">${genLab}</span></div>
+    <div class="t"><span class="time">${mins(g.L)}분<small>${fmtM(g.L)}</small></span><span class="pill">노출 기준 100</span></div>
+    ${bar(g)}
+  </div>
+  <div class="card" style="--c:var(--r-clean)" role="button" tabindex="0" data-k="clean" aria-pressed="${state.show.clean}">
+    <div class="t"><span class="lab">저노출 우회 <small>우리 경로</small></span></div>
+    ${same?`<div class="meta">이 달·시간엔 일반 경로가 이미 가장 덜 노출돼. 더 나은 우회로 없음</div>`:
+    `<div class="t"><span class="time">${mins(c.L)}분<small>${fmtM(c.L)} · +${mins(c.L)-mins(g.L)}분</small></span><span class="pill ${de<-0.5?'good':''}">노출 ${Math.round(100+de)} (${de.toFixed(0)}%)</span></div>`}
+    ${bar(c)}
+  </div>
+  <div class="legend"><span><span class="dot" style="background:var(--c-con)"></span>공사</span><span><span class="dot" style="background:var(--c-traf)"></span>교통배기</span><span><span class="dot" style="background:var(--c-pol)"></span>꽃가루</span><span>막대 = 노출 구성</span></div>`;
+  cards.querySelectorAll('.card').forEach(el=>{const t=()=>{state.show[el.dataset.k]=!state.show[el.dataset.k];run();};el.onclick=t;el.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();t();}};});
+  monthChart();
+}
+function monthChart(){
+  const rows=[];for(let m=1;m<=12;m++){const p=plan(m);rows.push({m,g:p.gen.ex,c:p.clean.ex,same:p.clean.edges.join()===p.gen.edges.join()||p.clean.ex>=p.gen.ex*0.995});}
+  const W=340,H=170,pl=6,pr=6,pt=22,pb=22,bw=(W-pl-pr)/12,top=Math.max(...rows.map(r=>r.g))*1.08||1;
+  const y=v=>H-pb-(v/top)*(H-pb-pt);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 일반 경로와 저노출 우회의 노출량">`;
+  s+=`<line x1="${pl}" x2="${W-pr}" y1="${H-pb}" y2="${H-pb}" stroke="${css('--line')}"/>`;
+  rows.forEach((r,i)=>{
+    const x=pl+i*bw,cur=r.m===state.month;
+    if(cur)s+=`<rect x="${x+1}" y="${pt-18}" width="${bw-2}" height="${H-pt-pb+18}" rx="4" fill="${css('--soft')}"/>`;
+    const w=(bw-6)/2;
+    s+=`<rect x="${x+3}" y="${y(r.g)}" width="${w}" height="${H-pb-y(r.g)}" rx="1.5" fill="${css('--r-gen')}" opacity=".55"/>`;
+    s+=`<rect x="${x+3+w}" y="${y(r.c)}" width="${w}" height="${H-pb-y(r.c)}" rx="1.5" fill="${css('--r-clean')}"/>`;
+    const red=r.g>0?Math.round((r.c/r.g-1)*100):0;
+    s+=`<text class="val" x="${x+bw/2}" y="${y(r.g)-4}" text-anchor="middle">${r.same||red===0?'–':red+'%'}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-7}" text-anchor="middle" ${cur?'style="fill:var(--ink);font-weight:700"':''}>${r.m}월</text>`;
+    s+=`<rect class="hit" data-m="${r.m}" x="${x}" y="0" width="${bw}" height="${H}"><title>${r.m}월 · 일반 ${Math.round(r.g)} / 우회 ${Math.round(r.c)} (${red}%)</title></rect>`;
+  });
+  s+='</svg>';
+  $('mchart').innerHTML=s+`<p class="note" style="margin-top:4px">막대 높이 = 경로 전체 가중 노출량(상대값), 숫자 = 우회 시 감소율. 꽃가루 비산기(2–6월)에 차이가 커져.</p>`;
+  $('mchart').querySelectorAll('.hit').forEach(el=>el.onclick=()=>setMonth(+el.dataset.m));
+}
+
+// ---------- 네이버 링크 ----------
+function merc([lon,lat]){const R=20037508.34;return[lon*R/180,Math.log(Math.tan((90+lat)*Math.PI/360))/(Math.PI/180)*R/180];}
+function naverLink(){
+  const a=$('naver');
+  if(state.o==null||state.d==null){a.href='https://map.naver.com/p/directions/-/-/-/walk';return;}
+  const [ox,oy]=merc(G.nodes[state.o]),[dx,dy]=merc(G.nodes[state.d]);
+  const on=encodeURIComponent($('inO').value||'출발'),dn=encodeURIComponent($('inD').value||'도착');
+  a.href=`https://map.naver.com/p/directions/${ox.toFixed(4)},${oy.toFixed(4)},${on},,/${dx.toFixed(4)},${dy.toFixed(4)},${dn},,/-/walk`;
+}
+
+// ---------- 장소 검색 ----------
+function nearest([lon,lat]){let b=0,bd=1e18;G.nodes.forEach(([x,y],i)=>{const d=((x-lon)*KX)**2+((y-lat)*KY)**2;if(d<bd){bd=d;b=i;}});return b;}
+const ICON={역:'🚇',한강:'🌊',공원:'🌳',학교:'🏫',아파트:'🏢',상가:'🛍'};
+const ORDER={역:0,한강:1,학교:2,공원:3,정류장:4,시설:5,상가:6,아파트:7};
+let active=null,suggIdx=-1,suggList=[];
+const norm=s=>s.replace(/\s|\(.*?\)/g,'').toLowerCase();
+function showSugg(which){
+  active=which;const q=norm($(which==='o'?'inO':'inD').value);
+  suggList=POIS.filter(p=>!q||norm(p[0]).includes(q)).sort((a,b)=>ORDER[a[1]]-ORDER[b[1]]||a[0].localeCompare(b[0],'ko')).slice(0,30);
+  const box=$('sugg');if(!suggList.length){box.hidden=true;return;}
+  box.style.top=which==='o'?'42px':'100%';
+  box.innerHTML=suggList.map((p,i)=>`<button type="button" data-i="${i}" class="${i===suggIdx?'on':''}"><span>${p[0]}</span><small>${p[1]}</small></button>`).join('');
+  box.hidden=false;
+  box.querySelectorAll('button').forEach(b=>b.onmousedown=ev=>{ev.preventDefault();pick(suggList[+b.dataset.i]);});
+}
+function pick(p){
+  const which=active;$(which==='o'?'inO':'inD').value=p[0];state[which]=nearest([p[2],p[3]]);
+  $('sugg').hidden=true;suggIdx=-1;state.via=[];
+  if(which==='o'&&state.d==null)$('inD').focus();
+  run();fitRoute();
+}
+['o','d'].forEach(w=>{const el=$(w==='o'?'inO':'inD');
+  el.onfocus=()=>{suggIdx=-1;showSugg(w);};el.oninput=()=>{suggIdx=-1;showSugg(w);};
+  el.onblur=()=>setTimeout(()=>{if(active===w)$('sugg').hidden=true;},120);
+  el.onkeydown=ev=>{if($('sugg').hidden)return;if(ev.key==='ArrowDown'){suggIdx=Math.min(suggList.length-1,suggIdx+1);showSugg(w);ev.preventDefault();}
+    else if(ev.key==='ArrowUp'){suggIdx=Math.max(0,suggIdx-1);showSugg(w);ev.preventDefault();}
+    else if(ev.key==='Enter'){pick(suggList[Math.max(0,suggIdx)]);ev.preventDefault();}else if(ev.key==='Escape'){$('sugg').hidden=true;}};
+});
+document.querySelectorAll('.x').forEach(b=>b.onclick=()=>{const w=b.dataset.x;state[w]=null;state.via=[];$(w==='o'?'inO':'inD').value='';run();});
+$('swap').onclick=()=>{[state.o,state.d]=[state.d,state.o];const a=$('inO').value;$('inO').value=$('inD').value;$('inD').value=a;state.via.reverse();run();};
+const QUICK=[['고속터미널역 (약 위치)','잠원한강공원'],['구반포역 (약 위치)','세빛섬'],['신반포역 (약 위치)','잠원역 (약 위치)'],['세화고등학교','반포한강공원']];
+$('chips').innerHTML=QUICK.map((q,i)=>`<button class="chip" type="button" data-i="${i}">${q[0].replace(' (약 위치)','')} → ${q[1].replace(' (약 위치)','')}</button>`).join('');
+$('chips').onclick=e=>{const b=e.target.closest('button');if(!b)return;const[o,d]=QUICK[+b.dataset.i];const po=POIS.find(p=>p[0]===o),pd=POIS.find(p=>p[0]===d);if(!po||!pd)return;
+  $('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);state.via=[];run();fitRoute();};
+function fitRoute(){if(!last)return;const pts=lineOf(last.gen.edges.concat(last.clean.edges));if(pts.length)map.fitBounds(L.latLngBounds(pts).pad(0.25),{maxZoom:16});}
+
+// ---------- 지도 클릭 ----------
+map.on('click',ev=>{
+  const ll=[ev.latlng.lng,ev.latlng.lat];
+  if(state.mode==='site'){userSites.push({kind:'circle',ll,m:toM(ll),r:60});refreshSites();return;}
+  if(state.mode==='via'){if(state.o==null||state.d==null)return;state.via.push({node:nearest(ll)});run();return;}
+  const div=document.createElement('div');div.className='pop';
+  div.innerHTML=`<button type="button" style="background:${css('--o')}">출발</button><button type="button" style="background:${css('--d')}">도착</button>`;
+  const pop=L.popup({closeButton:false,offset:[0,-2]}).setLatLng(ev.latlng).setContent(div).openOn(map);
+  const [bo,bd]=div.querySelectorAll('button');
+  const label=`지도 선택 (${ll[1].toFixed(4)}, ${ll[0].toFixed(4)})`;
+  bo.onclick=()=>{if(view!=='route')location.hash='#route';state.o=nearest(ll);$('inO').value=label;state.via=[];map.closePopup(pop);run();};
+  bd.onclick=()=>{if(view!=='route')location.hash='#route';state.d=nearest(ll);$('inD').value=label;state.via=[];map.closePopup(pop);run();};
+});
+function setMode(m){
+  state.mode=state.mode===m?null:m;
+  $('viaBtn').setAttribute('aria-pressed',state.mode==='via');$('viaBtn').textContent=state.mode==='via'?'경유지 찍는 중 · 끝내기':'경유지 찍어 네이버 경로 맞추기';
+  $('addSite').setAttribute('aria-pressed',state.mode==='site');$('addSite').textContent=state.mode==='site'?'공사장 찍는 중 · 끝내기':'＋ 공사장 찍기';
+  $('viaNote').textContent=state.mode==='via'?'지도에서 네이버 경로가 지나가는 지점을 순서대로 찍어줘. 일반 경로가 그 지점들을 지나도록 바뀌어.':'네이버에서 연 경로가 우리 \'일반 경로\'와 다르면, 경유지를 찍어 똑같이 만든 뒤 노출을 비교할 수 있어.';
+}
+$('viaBtn').onclick=()=>setMode('via');
+$('viaClear').onclick=()=>{state.via=[];run();};
+$('addSite').onclick=()=>setMode('site');
+$('clearSites').onclick=()=>{userSites=[];refreshSites();};
+
+// ---------- 월·시간 ----------
+const mEl=$('months');
+mEl.innerHTML=Array.from({length:12},(_,i)=>`<button type="button" data-v="${i+1}" aria-pressed="false" title="${i+1}월${MONTHS.includes(i+1)?' · 꽃가루 수목 비산':''}">${i+1}${MONTHS.includes(i+1)?'<span class="pd"></span>':''}</button>`).join('');
+mEl.onclick=e=>{const b=e.target.closest('button');if(b)setMonth(+b.dataset.v);};
+function setMonth(m){state.month=m;mEl.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===m));$('mapMonth').textContent=m+'월';whenNote();update();}
+let timer=null;
+$('play').onclick=()=>{const b=$('play');if(timer){clearInterval(timer);timer=null;b.setAttribute('aria-pressed','false');b.textContent='▶ 1–12월 재생';return;}
+  b.setAttribute('aria-pressed','true');b.textContent='■ 멈추기';setMonth(1);timer=setInterval(()=>{if(state.month>=12){$('play').click();return;}setMonth(state.month+1);},1400);};
+$('day').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.weekday=+b.dataset.v;$('day').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));whenNote();update();};
+$('hour').innerHTML=Array.from({length:18},(_,i)=>i+6).map(h=>`<option value="${h}" ${h===state.hour?'selected':''}>${h}시</option>`).join('');
+$('hour').onchange=()=>{state.hour=+$('hour').value;whenNote();update();};
+function whenNote(){
+  const c=(state.weekday&&state.hour>=7&&state.hour<18)?'공사 작업 중':'공사 비작업시간';
+  const p=[7,8,17,18,19].includes(state.hour)?' · 출퇴근 교통 ×1.3':'';
+  const pol=MONTHS.includes(state.month)?' · 꽃가루 수목 비산기':' · 수목 꽃가루 없음';
+  $('whenNote').textContent=c+p+pol;
+}
+[['wC','C','oC'],['wT','T','oT'],['wP','P','oP']].forEach(([id,k,o])=>{const el=$(id);el.oninput=()=>{state.w[k]=+el.value;$(o).textContent=(+el.value).toFixed(1);};el.onchange=()=>{setPersona('custom',true);update();};});
+const PERSONA={all:{w:{C:1.53,T:1.78,P:1.19},note:'설문 전체 56명의 요인별 (경험 빈도 × 불편 점수) 평균 비율. 교통배기를 가장 자주·크게 겪음.'},
+  alg:{w:{C:1.09,T:0.90,P:2.51},note:'꽃가루 불편 4–5점 응답자 14명 기준. 이들의 꽃가루 불편 평균은 4.4점(나머지 1.5점). 전체 평균으로만 정하면 알레르기 있는 사람의 부담이 묻혀.'}};
+function setPersona(p,keep){
+  state.persona=p;$('persona').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===p));
+  if(PERSONA[p]&&!keep){state.w={...PERSONA[p].w};[['wC','C','oC'],['wT','T','oT'],['wP','P','oP']].forEach(([id,k,o])=>{$(id).value=state.w[k];$(o).textContent=state.w[k].toFixed(1);});}
+  $('pnote').textContent=PERSONA[p]?PERSONA[p].note:'아래 슬라이더 값으로 계산 중.';
+  $('wview').innerHTML=[['C','공사','--c-con'],['T','교통배기','--c-traf'],['P','꽃가루','--c-pol']].map(([k,n,c])=>`<span><span class="dot" style="background:var(${c})"></span>${n} ${state.w[k].toFixed(2)}</span>`).join('');
+}
+$('persona').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v==='custom'){setPersona('custom',true);$('wdetails').open=true;return;}setPersona(b.dataset.v);update();};
+$('cap').oninput=()=>{state.cap=+$('cap').value;$('oCap').textContent=(+$('cap').value).toFixed(2);};$('cap').onchange=run;
+$('layer').onchange=e=>{state.layer=e.target.value;drawNet();};
+function refreshSites(){siteVer++;computeC();drawSites();update();}
+const redraw=()=>{drawBase();drawSites();update();};
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw);}catch(e){}
+
+
+// ---------- 피크닉 ----------
+const picLayer=L.layerGroup();
+let view='route';
+const PM=PIC.months;
+function picX(p,m){const cOn=(state.weekday&&state.hour>=7&&state.hour<18)?1:0.15;const peak=[7,8,17,18,19].includes(state.hour)?1.3:1;const mi=PM.indexOf(m);return {C:p.C*cOn,T:p.T*peak,P:mi>=0?p.P[mi]:0};}
+const wsum=x=>state.w.C*x.C+state.w.T*x.T+state.w.P*x.P;
+function picTop(){ // 연중·전 격자 97퍼센타일 = 위험도 100 (가중치·시간이 같으면 달끼리 비교 가능)
+  const a=[];PIC.pts.forEach(p=>{for(let m=1;m<=12;m++)a.push(wsum(picX(p,m)));});a.sort((x,y)=>x-y);return a[Math.floor(a.length*.97)]||1;}
+const score=(p,m,top)=>Math.min(100,Math.round(wsum(picX(p,m))/top*100));
+const PLACE_CATS=new Set(['한강','공원','시설','역']);
+function placeName(p){let best=null,bd=1e18;const [x,y]=toM(p.ll);POIS.forEach(q=>{if(!PLACE_CATS.has(q[1]))return;const[qx,qy]=toM([q[2],q[3]]);const d=Math.hypot(qx-x,qy-y);if(d<bd){bd=d;best=q;}});
+  return bd<450?best[0].replace(/ \((약 위치|정류장)\)/,'')+' 근처':p.park;}
+function pickSpread(sorted,n,gap){const out=[];for(const p of sorted){const[x,y]=toM(p.ll);if(out.every(q=>{const[a,b]=toM(q.ll);return Math.hypot(a-x,b-y)>=gap;}))out.push(p);if(out.length>=n)break;}return out;}
+function scoreColor(v){return ramp(v/100);}
+function drawPicnic(){
+  picLayer.clearLayers();
+  const top=picTop(),m=state.month;
+  const dy=PIC.grid/2/KY,dx=PIC.grid/2/KX;
+  const scored=PIC.pts.map(p=>({p,s:score(p,m,top),x:picX(p,m)}));
+  scored.forEach(({p,s})=>L.rectangle([[p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx]],{renderer,stroke:false,fillColor:scoreColor(s),fillOpacity:.8}).bindTooltip(`위험도 ${s}`).addTo(picLayer));
+  const asc=[...scored].sort((a,b)=>a.s-b.s||a.p.T-b.p.T);
+  const best=pickSpread(asc.map(o=>o.p),3,350).map(p=>scored.find(o=>o.p===p));
+  const worst=[...scored].sort((a,b)=>b.s-a.s)[0];
+  const card=(o,i,bad)=>{
+    const tot=wsum(o.x)||1e-9,pc=k=>Math.round(state.w[k]*o.x[k]/tot*100);
+    const main=['C','T','P'].sort((a,b)=>state.w[b]*o.x[b]-state.w[a]*o.x[a])[0];
+    const why=o.s<5?'세 요인 모두 거의 없음':`주요인: ${{C:'공사 먼지',T:'올림픽대로 등 배기가스',P:'꽃가루'}[main]} ${pc(main)}%`;
+    return `<div class="spot"><div class="t"><b><span class="rank ${bad?'bad':''}">${bad?'!':i+1}</span>${placeName(o.p)}</b><span class="score" style="background:${scoreColor(o.s)};color:${o.s>55?'#fff':'#1b2420'}">위험도 ${o.s}</span></div>
+      <div class="why">${why} · 물가까지 ${o.p.river}m</div>
+      <div class="bar" aria-hidden="true">${['C','T','P'].map(k=>`<span style="width:${Math.min(100,state.w[k]*o.x[k]/(top)*100)}%;background:var(${k==='C'?'--c-con':k==='T'?'--c-traf':'--c-pol'})"></span>`).join('')}</div>
+      ${bad?'':`<div class="acts"><button class="btn" type="button" data-go="${PIC.pts.indexOf(o.p)}">여기로 저노출 길찾기</button><button class="btn" type="button" data-fly="${PIC.pts.indexOf(o.p)}">지도에서 보기</button></div>`}</div>`;};
+  $('spots').innerHTML=best.map((o,i)=>card(o,i,false)).join('')+`<p class="note" style="margin-top:4px">피하면 좋은 자리</p>`+card(worst,0,true);
+  best.forEach((o,i)=>L.marker([o.p.ll[1],o.p.ll[0]],{icon:L.divIcon({className:'',html:`<span class="rank" style="box-shadow:0 0 0 2px var(--panel)">${i+1}</span>`,iconSize:[20,20],iconAnchor:[10,10]})}).addTo(picLayer));
+  $('picTitle').textContent=`${m}월 ${state.weekday?'평일':'주말'} ${state.hour}시 추천 피크닉 장소`;
+  $('spots').querySelectorAll('[data-fly]').forEach(b=>b.onclick=()=>{const p=PIC.pts[+b.dataset.fly];map.flyTo([p.ll[1],p.ll[0]],17);});
+  $('spots').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const p=PIC.pts[+b.dataset.go];state.d=p.node;state.via=[];$('inD').value=placeName(p)+' (피크닉)';location.hash='#route';if(state.o==null){$('inO').focus();}});
+  picChart(top);
+}
+function picChart(top){
+  const rows=[];for(let m=1;m<=12;m++){const s=PIC.pts.map(p=>score(p,m,top));rows.push({m,avg:s.reduce((a,b)=>a+b,0)/s.length,min:Math.min(...s)});}
+  const W=340,H=150,pl=6,pr=6,pt=18,pb=22,bw=(W-pl-pr)/12,mx=Math.max(...rows.map(r=>r.avg))*1.1||1,y=v=>H-pb-(v/mx)*(H-pb-pt);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 공원 평균 위험도와 최저 위험도">`;
+  s+=`<line x1="${pl}" x2="${W-pr}" y1="${H-pb}" y2="${H-pb}" stroke="${css('--line')}"/>`;
+  rows.forEach((r,i)=>{const x=pl+i*bw,cur=r.m===state.month,w=(bw-6)/2;
+    if(cur)s+=`<rect x="${x+1}" y="2" width="${bw-2}" height="${H-pb-2}" rx="4" fill="${css('--soft')}"/>`;
+    s+=`<rect x="${x+3}" y="${y(r.avg)}" width="${w}" height="${H-pb-y(r.avg)}" rx="1.5" fill="${css('--r-gen')}" opacity=".55"/>`;
+    s+=`<rect x="${x+3+w}" y="${y(r.min)}" width="${w}" height="${Math.max(1,H-pb-y(r.min))}" rx="1.5" fill="${css('--r-clean')}"/>`;
+    s+=`<text class="val" x="${x+bw/2}" y="${y(r.avg)-4}" text-anchor="middle">${Math.round(r.avg)}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-7}" text-anchor="middle" ${cur?'style="fill:var(--ink);font-weight:700"':''}>${r.m}월</text>`;
+    s+=`<rect class="hit" data-m="${r.m}" x="${x}" y="0" width="${bw}" height="${H}"><title>${r.m}월 · 평균 ${Math.round(r.avg)} / 최저 ${r.min}</title></rect>`;});
+  $('pchart').innerHTML=s+'</svg><p class="note" style="margin-top:4px">숫자 = 공원 평균 위험도. 3–5월은 물가 버드나무·주변 수목 꽃가루 때문에 올라가.</p>';
+  $('pchart').querySelectorAll('.hit').forEach(el=>el.onclick=()=>setMonth(+el.dataset.m));
+}
+function update(){drawNet();if(view==='route')run();else drawPicnic();}
+const parkBounds=L.latLngBounds(PIC.pts.map(p=>[p.ll[1],p.ll[0]]));
+function setView(v){
+  view=v==='picnic'?'picnic':'route';document.body.dataset.view=view;
+  $('tabRoute').toggleAttribute('aria-current',view==='route');$('tabPicnic').toggleAttribute('aria-current',view==='picnic');
+  if(view==='route'){$('tabRoute').setAttribute('aria-current','page');map.removeLayer(picLayer);routeLayer.addTo(map);markLayer.addTo(map);netLayer.eachLayer(l=>l.setStyle&&l.setStyle({opacity:.9}));$('layerLab').textContent='링크 색: 미터당 노출';}
+  else{$('tabPicnic').setAttribute('aria-current','page');map.removeLayer(routeLayer);map.removeLayer(markLayer);picLayer.addTo(map);$('layerLab').textContent='공원 칸: 피크닉 위험도 · 길: 노출';}
+  update();
+  if(view==='picnic')map.fitBounds(parkBounds.pad(0.05));else fitRoute();
+}
+window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
+
+// ---------- 내 위치 ----------
+$('geo').onclick=()=>{
+  if(!navigator.geolocation){$('geoNote').textContent='이 브라우저는 위치를 지원하지 않아.';return;}
+  $('geoNote').textContent='위치 찾는 중…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const ll=[pos.coords.longitude,pos.coords.latitude];
+    if(!bounds.pad(0.15).contains([ll[1],ll[0]])){$('geoNote').textContent='지금 위치가 반포·잠원 밖이야. 검색으로 골라줘.';return;}
+    state.o=nearest(ll);state.via=[];$('inO').value='내 위치';$('geoNote').textContent='';run();fitRoute();
+  },()=>{$('geoNote').textContent='위치 권한을 허용해야 쓸 수 있어.';},{enableHighAccuracy:true,timeout:10000});
+};
+
+// ---------- 시작 ----------
+computeC();drawBase();drawSites();setPersona('all');
+state.month=now.getMonth()+1;
+{const po=POIS.find(p=>p[0]==='고속터미널역 (약 위치)'),pd=POIS.find(p=>p[0]==='잠원한강공원');$('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);}
+mEl.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.month));$('mapMonth').textContent=state.month+'월';whenNote();
+setView(location.hash.slice(1));
+$('loading').remove();
+}
+boot().catch(e=>{document.getElementById('loading').textContent='데이터를 불러오지 못했어요: '+e.message;});
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
