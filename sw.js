@@ -1,5 +1,5 @@
 // 오프라인·홈 화면 앱용 캐시: 먼저 캐시를 보여주고 뒤에서 새 버전을 받아 둠
-const CACHE = 'soom-v15';
+const CACHE = 'soom-v16';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'data/graph.json', 'data/pois.json', 'data/picnic.json', 'data/roads.json',
   'icons/icon-192.png', 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'];

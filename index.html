@@ -635,8 +635,10 @@ function kakaoAdapter(){
     fit(pts,p){if(!pts.length)return;const b=new K.LatLngBounds();let s=90,w=180,nn=-90,e=-180;pts.forEach(q=>{b.extend(LL(q));s=Math.min(s,q[0]);nn=Math.max(nn,q[0]);w=Math.min(w,q[1]);e=Math.max(e,q[1]);});
       // 시트·상단바를 뺀 영역 안에 전체가 들어오게: 먼저 화면 전체에 맞춘 뒤 필요한 만큼 축소하고, 보이는 영역 가운데로 옮김
       map.setBounds(b,0,0,0,0);const W=el.clientWidth,H=el.clientHeight,aw=Math.max(80,W-p.l-p.r-32),ah=Math.max(80,H-p.t-p.b-32);
-      const f=Math.max(W/aw,H/ah),n=Math.ceil(Math.log2(f)-0.02);if(n>0)map.setLevel(map.getLevel()+n);
-      const proj=map.getProjection(),pt=proj.pointFromCoords(new K.LatLng((s+nn)/2,(w+e)/2));
+      let proj=map.getProjection();const p1=proj.pointFromCoords(new K.LatLng(s,w)),p2=proj.pointFromCoords(new K.LatLng(nn,e));
+      const pw=Math.abs(p2.x-p1.x)||1,ph=Math.abs(p2.y-p1.y)||1,lv=Math.ceil(Math.log2(Math.max(pw/aw,ph/ah))-1e-6);
+      map.setLevel(Math.max(1,Math.min(10,map.getLevel()+lv)));
+      proj=map.getProjection();const pt=proj.pointFromCoords(new K.LatLng((s+nn)/2,(w+e)/2));
       map.setCenter(proj.coordsFromPoint(new K.Point(pt.x+(p.r-p.l)/2,pt.y+(p.b-p.t)/2)));},
     fly(ll,z){map.setLevel(3,{animate:true});map.panTo(LL(ll));},
     onClick(fn){K.event.addListener(map,'click',e=>{if(Date.now()-suppress<300)return;fn([e.latLng.getLng(),e.latLng.getLat()]);});},
