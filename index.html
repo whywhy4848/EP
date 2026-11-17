@@ -227,6 +227,10 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
 .rep{background:#fff;border-radius:16px;padding:10px 12px;display:flex;gap:10px;align-items:center}
 .rep .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
 .rmark{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 11px var(--f);color:#fff;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.zchip{display:inline-block;white-space:nowrap;font:700 11.5px var(--f);padding:3px 9px;border-radius:999px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.18);cursor:pointer}
+.zchip.on{outline:2.5px solid #e8b04b;font-size:12.5px;padding:4px 11px}
+.zdot{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;font:800 11px var(--f);border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.2);cursor:pointer}
+.zrank{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:15px;flex:none}
 .foot{font-size:11px;color:#8a9a91;text-align:center;padding:4px 0 2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -359,11 +363,11 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
         <div class="t"><span class="h-sub" id="picWhere">반포·잠원 한강공원</span><span style="font-weight:700">피크닉하기 좋은 시간</span><b id="picBest"></b><span class="note" id="picBestSub"></span></div>
         <svg aria-hidden="true"><use href="#il-picnic"/></svg>
       </div>
-      <div class="between"><h2 id="picTitle">추천 자리</h2><div class="cond" data-cond></div></div>
+      <div class="between"><h2 id="picTitle">구간별 숨 점수</h2><div class="cond" data-cond></div></div>
       <div id="spots" style="display:flex;flex-direction:column;gap:8px"></div>
       <div class="bring" id="bring"></div>
       <button class="btn" type="button" id="picGo"></button>
-      <p class="note">한강공원 안은 수목 자료가 없어서, 물가 버드나무류 꽃가루(3–4월)는 한강생태지도를 바탕으로 추정했어요.</p>
+      <p class="note">점수 0–100은 공원 모든 칸·12달·아침/낮/저녁 중 상위 10% 노출을 100으로 둔 값이라 달·시간끼리 비교할 수 있어요. 한강공원 안은 수목 자료가 거의 없어서, 물가 버드나무류(3–4월)와 식재 수종(자작·포플러·대왕참나무 4–5월, 메타세쿼이아 2–3월, 참느릅나무 9월) 꽃가루는 한강생태지도를 바탕으로 추정했고, 숲·나무 위치는 OpenStreetMap을 썼어요.</p>
     </section>
 
     <!-- 월별 -->
@@ -805,44 +809,58 @@ $('clearSites').onclick=()=>{userSites=[];refreshSites();};
 const PM=PIC.months;
 function picX(p,m,h,wd){const work=wd&&h>=7&&h<18,peak=[7,8,17,18,19].includes(h);const mi=PM.indexOf(m);return {C:p.C*(work?1:0.15)+(p.Rc||0),T:p.T*(peak?1.3:1)+(p.Rt||0),P:(mi>=0?p.P[mi]:0)*pollenMul(m)+(p.Rp||0)};}
 let picTopKey=null,picTopVal=1;
-function picTop(){const k=[state.w.C,state.w.T,state.w.P,siteVer,state.persona].join();if(k===picTopKey)return picTopVal;const a=[];
-  PIC.pts.forEach(p=>{for(let m=1;m<=12;m++)a.push(wsum(picX(p,m,8,1)));});a.sort((x,y)=>x-y);picTopKey=k;picTopVal=a[Math.floor(a.length*.97)]||1;return picTopVal;}
+// 점수 기준: 공원 전체 칸 × 12달 × 아침·낮·저녁의 90퍼센타일 = 100 (달·시간끼리 비교 가능한 절대 척도)
+function picTop(){const k=[state.w.C,state.w.T,state.w.P,siteVer,repVer,state.persona].join();if(k===picTopKey)return picTopVal;const a=[];
+  PIC.pts.forEach(p=>{for(let m=1;m<=12;m++)for(const h of [8,13,18])a.push(wsum(picX(p,m,h,1)));});a.sort((x,y)=>x-y);picTopKey=k;picTopVal=a[Math.floor(a.length*.9)]||1;return picTopVal;}
 const score=(p,m,h,wd)=>Math.min(100,Math.round(wsum(picX(p,m,h,wd))/picTop()*100));
 const PLACE_CATS=new Set(['한강','공원','시설','역']);
 function placeName(p){let best=null,bd=1e18;const[x,y]=toM(p.ll);POIS.forEach(q=>{if(!PLACE_CATS.has(q[1]))return;const[qx,qy]=toM([q[2],q[3]]);const d=Math.hypot(qx-x,qy-y);if(d<bd){bd=d;best=q;}});
   return bd<450?best[0].replace(/ \((약 위치|정류장)\)/,'')+' 근처':p.park;}
-function pickSpread(sorted,n,gap){const out=[];for(const p of sorted){const[x,y]=toM(p.ll);if(out.every(q=>{const[a,b]=toM(q.ll);return Math.hypot(a-x,b-y)>=gap;}))out.push(p);if(out.length>=n)break;}return out;}
-const stCls=s=>s<25?['st-good','좋음']:s<55?['st-ok','보통']:['st-bad','나쁨'];
-function spotIcon(p,x){if(p.river<70)return['il-river','#e7f3f6'];if(x.P>0.15)return['il-tree','#e6f2ea'];return['il-grass','#f4f7e6'];}
-function bestHour(m,wd){let best=null;for(let h=9;h<=21;h++){const s=PIC.pts.map(p=>score(p,m,h,wd)).sort((a,b)=>a-b);const v=s[0]+s[Math.floor(s.length*.1)];if(!best||v<best.v)best={h,v};}return best.h;}
-let picSel=0,picBest=[];
+const stCls=s=>s<25?['st-good','좋음']:s<50?['st-ok','보통']:['st-bad','나쁨'];
+function bestHour(m,wd){let best=null;for(let h=9;h<=21;h++){const s=PIC.pts.map(p=>score(p,m,h,wd)).sort((a,b)=>a-b);const v=s[Math.floor(s.length*.1)]+s[Math.floor(s.length*.5)];if(!best||v<best.v)best={h,v};}return best.h;}
+
+// 구간 나누기: 한강 따라 약 450m씩
+const ZONES=(()=>{const xy=PIC.pts.map(p=>toM(p.ll));const cx=xy.reduce((s,q)=>s+q[0],0)/xy.length,cy=xy.reduce((s,q)=>s+q[1],0)/xy.length;
+  let sxx=0,sxy=0,syy=0;xy.forEach(([x,y])=>{sxx+=(x-cx)**2;sxy+=(x-cx)*(y-cy);syy+=(y-cy)**2;});
+  const ang=.5*Math.atan2(2*sxy,sxx-syy),ux=Math.cos(ang),uy=Math.sin(ang);
+  const t=xy.map(([x,y])=>(x-cx)*ux+(y-cy)*uy),t0=Math.min(...t),L=450;
+  const zs=[];PIC.pts.forEach((p,i)=>{const z=Math.floor((t[i]-t0)/L);(zs[z]=zs[z]||{pts:[]}).pts.push(p);});
+  const out=zs.filter(z=>z&&z.pts.length>=6);const cnt={};
+  out.forEach(z=>{const lon=z.pts.reduce((s,p)=>s+p.ll[0],0)/z.pts.length,lat=z.pts.reduce((s,p)=>s+p.ll[1],0)/z.pts.length;z.c=[lat,lon];
+    const park=z.pts[0].park.replace('한강공원','');cnt[park]=(cnt[park]||0)+1;
+    const [x,y]=toM([lon,lat]);const near=POIS.filter(q=>(q[1]==='한강'||q[1]==='공원')&&!/한강공원/.test(q[0])).map(q=>{const[qx,qy]=toM([q[2],q[3]]);return{n:q[0],d:Math.hypot(qx-x,qy-y)};}).sort((a,b)=>a.d-b.d)[0];
+    z.name=`${park} ${cnt[park]}구간${near&&near.d<350?' · '+near.n+' 근처':''}`;});
+  return out;})();
+let picSel=null;
+const FN2={C:'공사장 먼지',T:'올림픽대로·다리 배기가스',P:'꽃가루'};
 function drawPicnic(){
   picLayer.clear();const m=state.month,h=state.hour,wd=state.weekday;
   const dy=PIC.grid/2/KY,dx=PIC.grid/2/KX;
-  const scored=PIC.pts.map(p=>({p,s:score(p,m,h,wd),x:picX(p,m,h,wd)}));
-  scored.forEach(({p,s})=>picLayer.add(M.rect([p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx],{fill:ramp(s/100),fillOpacity:.62})));
-  const asc=[...scored].sort((a,b)=>a.s-b.s||a.p.T-b.p.T);
-  picBest=pickSpread(asc.map(o=>o.p),2,350).map(p=>scored.find(o=>o.p===p));
-  const worst=[...scored].sort((a,b)=>b.s-a.s)[0];
-  const list=[...picBest,worst];if(picSel>=picBest.length)picSel=0;
-  const why=o=>{const main=['C','T','P'].sort((a,b)=>state.w[b]*o.x[b]-state.w[a]*o.x[a])[0];
-    if(o.s<8)return'세 가지 다 거의 없어요';return{C:'공사장 먼지가 조금 와요',T:'올림픽대로 배기가스가 와요',P:o.p.river<70&&[3,4].includes(m)?'물가 버드나무 꽃가루가 날려요':'주변 나무 꽃가루가 날려요'}[main];};
-  $('spots').innerHTML=list.map((o,i)=>{const[cl,tx]=stCls(o.s),[ic,bg]=spotIcon(o.p,o.x),bad=i===list.length-1;
-    return`<div class="spot ${!bad&&i===picSel?'sel':''}"><button class="go" type="button" data-i="${i}" aria-label="${placeName(o.p)} 지도에서 보기"><span class="ic" style="background:${bg}"><svg aria-hidden="true"><use href="#${ic}"/></svg></span>
-      <span class="bd"><b>${bad?'피하면 좋은 곳 · ':''}${placeName(o.p)}</b><span>${why(o)} · 물가 ${o.p.river}m</span></span></button>
-      <span class="status ${cl}">${tx} ${o.s}</span></div>`;}).join('');
-  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,o=list[i];if(i<picBest.length){picSel=i;drawPicnic();}M.fly([o.p.ll[1],o.p.ll[0]],16.5);});
-  picBest.forEach((o,i)=>{picLayer.add(M.html([o.p.ll[1],o.p.ll[0]],`<span class="rank" style="${i===picSel?'background:#e8b04b;color:#3a2a06':''}">${i+1}</span>`,'center',()=>{picSel=i;drawPicnic();}));
-    if(i===picSel)picLayer.add(M.html([o.p.ll[1],o.p.ll[0]],labelHtml(placeName(o.p)),'label'));});
-  // 좋은 시간
+  const sc=new Map(PIC.pts.map(p=>[p,score(p,m,h,wd)]));
+  PIC.pts.forEach(p=>picLayer.add(M.rect([p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx],{fill:ramp(sc.get(p)/100),fillOpacity:.6})));
+  const zs=ZONES.map(z=>{const ss=z.pts.map(p=>sc.get(p)),avg=Math.round(ss.reduce((a,b)=>a+b,0)/ss.length);
+    const best=z.pts.reduce((a,b)=>sc.get(b)<sc.get(a)?b:a);const water=z.pts.filter(p=>p.river<60),inner=z.pts.filter(p=>p.river>=60);
+    const av=a=>a.length?Math.round(a.map(p=>sc.get(p)).reduce((x,y)=>x+y,0)/a.length):null;
+    const x=picX(best,m,h,wd),tot={C:0,T:0,P:0};z.pts.forEach(p=>{const q=picX(p,m,h,wd);for(const k in tot)tot[k]+=state.w[k]*q[k];});
+    const main=Object.keys(tot).sort((a,b)=>tot[b]-tot[a])[0],sum=tot.C+tot.T+tot.P;
+    return{z,avg,best,bs:sc.get(best),w:av(water),i:av(inner),main,share:sum?Math.round(tot[main]/sum*100):0,x};}).sort((a,b)=>a.avg-b.avg);
+  if(!picSel||!zs.find(o=>o.z===picSel))picSel=zs[0].z;
+  const sel=zs.find(o=>o.z===picSel);
+  zs.forEach((o,i)=>{const[cl]=stCls(o.avg);const on=o.z===picSel;picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name.split(' · ')[0]} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
+  picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06">★</span>`,'center'));
+  $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
+    const side=o.w!=null&&o.i!=null&&Math.abs(o.w-o.i)>=5?(o.w<o.i?`물가 쪽이 더 좋아요 (${o.w} vs 안쪽 ${o.i})`:`안쪽이 더 좋아요 (${o.i} vs 물가 ${o.w})`):'물가·안쪽 비슷해요';
+    const why=o.avg<8?'세 가지 다 거의 없어요':`주요인 ${FN2[o.main]} ${o.share}%`;
+    return`<div class="spot ${o.z===picSel?'sel':''}"><button class="go" type="button" data-i="${i}"><span class="zrank ${cl}">${i+1}</span>
+      <span class="bd"><b>${o.z.name}</b><span>${why} · ${side}</span></span></button><span class="status ${cl}">${tx} ${o.avg}</span></div>`;}).join('');
+  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const o=zs[+b.dataset.i];picSel=o.z;drawPicnic();M.fly(o.z.c,16);});
   const bh=bestHour(m,wd);$('picBest').textContent=hourLabel(bh);
   $('picBestSub').textContent=`${m}월 ${wd?'평일':'주말'} · ${bh>=18||bh<7?'공사 끝나고 출퇴근도 지난 시간':bh<17?'출퇴근 피한 한낮':'출퇴근 시간 전후'}`;
-  $('picTitle').textContent=`지금 추천 자리`;
-  const top=picBest[picSel];const main=['C','T','P'].sort((a,b)=>state.w[b]*top.x[b]-state.w[a]*top.x[a])[0];
-  const items=[];if(MONTHS.includes(m)||(top.p.river<70&&[3,4].includes(m)))items.push('마스크','안경');if(main==='T'&&!items.includes('마스크'))items.push('마스크');
-  $('bring').innerHTML=`<span>챙길 것</span>`+(items.length?items.map(t=>`<span class="pill">${t}</span>`).join(''):'<span class="pill">특별히 없어요</span>');
-  $('picGo').textContent=`${placeName(top.p).replace(' 근처','')}로 숨 편한 길 찾기`;
-  $('picGo').onclick=()=>{state.d=top.p.node;state.via=[];$('inD').value=placeName(top.p)+' (피크닉)';location.hash='#route';if(state.o==null)setTimeout(()=>$('inO').focus(),300);};
+  $('picTitle').textContent='구간별 숨 점수';
+  const items=[];const pv=sel.x.P;if(pv>0.1)items.push('마스크','안경');else if(sel.main==='T'||sel.main==='C')items.push('마스크');
+  $('bring').innerHTML=`<span>${sel.z.name.split(' · ')[0]} 챙길 것</span>`+(items.length?items.map(t=>`<span class="pill">${t}</span>`).join(''):'<span class="pill">특별히 없어요</span>');
+  $('picGo').textContent=`${sel.z.name.split(' · ')[0]} 명당(★)으로 숨 편한 길 찾기`;
+  $('picGo').onclick=()=>{state.d=sel.best.node;state.via=[];$('inD').value=sel.z.name.split(' · ')[0]+' 명당 (피크닉)';location.hash='#route';if(state.o==null)setTimeout(()=>$('inO').focus(),300);};
 }
 function picChart(){
   const rows=[];for(let m=1;m<=12;m++){const s=PIC.pts.map(p=>score(p,m,state.hour,state.weekday));rows.push({m,a:s.reduce((a,b)=>a+b,0)/s.length,b:Math.min(...s)});}
