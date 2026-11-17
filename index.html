@@ -394,6 +394,7 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
         <p><b>숨 편한 경로</b>는 링크 비용 = 길이 × (1 + 가중치 × 노출)인 최단경로예요. 가중치 배율을 0~16배로 바꿔 찾은 후보 중, 내 설정의 "더 걸을 시간"(기본 10분) 안에서 노출이 가장 적은 길을 골라요.</p>
         <p><b>노출</b> 공사장 exp(−거리/75m), 평일 7–18시 작업 가정(그 외 0.15). 교통 배기가스 간선 등급 × exp(−거리/50m), 출퇴근 ×1.3. 꽃가루 그 달 비산 수목(상 1, 중 0.5) 커널합 exp(−거리/30m). 건물 안 길은 20%.</p>
         <p><b>가중치</b> 우리 설문(2026.9.30–10.1, 56명)의 요인별 경험 빈도 × 불편 점수. 전체: 공사 1.53 · 교통 1.78 · 꽃가루 1.19. 꽃가루 민감(꽃가루 불편 4–5점, 14명): 1.09 · 0.90 · 2.51. 응답자가 20대에 몰려 있어 대표성 한계가 있어요.</p>
+        <p><b>공사장</b> 2026년 11월 기준 공사 중인 곳만 넣었어요: 디에이치 클래스트(반포주공1단지 1·2·4주구, 2027년 말 입주 목표), 디에이치 신반포에스테라(신반포22차, 2028년 1월 입주 예정), 강남역 일대 대심도 빗물배수터널. 경계는 OpenStreetMap. 래미안 트리니원·오티에르 반포 등 올해 준공된 곳과 2027년 착공 예정인 신반포12·16·27차는 뺐어요.</p>
         <p><b>내 숨 설정</b> 비염·아토피를 고르거나 예민한 나무를 고르면 꽃가루 민감 가중치에서 시작하고, 천식이면 배기가스·공사 먼지를 1.3배로 봐요. 예민한 나무를 고르면 그 나무가 꽃가루를 날리는 달엔 꽃가루를 1.5배, 다른 달엔 0.6배로 봐요(양버즘나무·참나무·은행나무 4–5월, 버드나무 3–4월, 소나무 5월, 메타세쿼이아 2–3월). 러닝은 호흡량이 많아 노출 전체를 더 크게 피해요.</p>
         <p><b>숨제보</b> 제보 위치에서 60m 감쇠로 해당 요인 노출을 더해요(정도 1–3, 3일에 걸쳐 줄어듦). 꽃가루 날림·재채기·눈 가려움은 꽃가루, 배기가스·목 따가움·기침은 배기가스, 공사장 먼지는 공사장으로 넣어요.</p>
         <p><b>데이터</b> 서울시 자치구별 도보 네트워크(서초구), 서울시 가로수·공원/사유지 수목(5,502그루), OpenStreetMap(한강공원 산책로·간선도로·공사구역·장소), 배경 지도는 OpenStreetMap 도로 자료로 직접 그림. 역 위치는 대략값이에요.</p>
@@ -473,11 +474,6 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
   </form>
 </dialog>
 
-<div class="drawbar" id="drawBar" hidden>
-  <input id="drawName" placeholder="구역 이름 (예: 디에이치 클래스트 공사장)" aria-label="구역 이름">
-  <div class="row" style="flex-wrap:nowrap;justify-content:space-between"><span id="drawMsg" class="note" style="color:#fff"></span>
-  <span class="row" style="flex-wrap:nowrap"><button type="button" id="drawUndo">되돌리기</button><button type="button" id="drawCancel">취소</button><button type="button" id="drawDone" class="ok" disabled>완료</button></span></div>
-</div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <dialog id="condDlg" aria-labelledby="condTitle">
@@ -495,16 +491,14 @@ dialog#onb::backdrop{background:rgba(20,35,27,.45)}
     </div>
     <div class="legend" id="wview"></div>
     <details id="wdetails">
-      <summary>가중치 직접 조정 · 우회 허용 · 공사장 추가</summary>
+      <summary>가중치 직접 조정 · 우회 허용 · 공사장 목록</summary>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
         <div class="slider"><label for="wC"><span class="dot" style="background:var(--coral)"></span> 공사장</label><input type="range" id="wC" min="0" max="4" step="0.1" value="1.53"><output id="oC">1.5</output></div>
         <div class="slider"><label for="wT"><span class="dot" style="background:var(--lav)"></span> 교통배기</label><input type="range" id="wT" min="0" max="4" step="0.1" value="1.78"><output id="oT">1.8</output></div>
         <div class="slider"><label for="wP"><span class="dot" style="background:var(--pollen)"></span> 꽃가루</label><input type="range" id="wP" min="0" max="4" step="0.1" value="1.19"><output id="oP">1.2</output></div>
         <div class="slider"><label for="cap">더 걸을 시간</label><input type="range" id="cap" min="0" max="20" step="1" value="10"><output id="oCap">10분</output></div>
         <p class="note">숨 편한 길이 최단 경로보다 이 시간 넘게 더 걸리면 고르지 않아요.</p>
-        <div class="row"><button class="btn sm ghost" id="drawSite" type="button">공사 구역 그리기</button><button class="btn sm ghost" id="addSite" type="button" aria-pressed="false">점으로 찍기</button><button class="btn sm ghost" id="clearSites" type="button">추가한 공사장 지우기</button></div>
-        <div class="row"><button class="btn sm ghost" id="copySites" type="button">그린 구역 좌표 복사</button></div>
-        <textarea id="copyOut" hidden readonly style="width:100%;height:70px;font-size:11px;border-radius:10px;border:1.5px solid var(--line)"></textarea>
+        <div class="row" hidden><button class="btn sm ghost" id="addSite" type="button" aria-pressed="false">지도에 공사장 찍기</button><button class="btn sm ghost" id="clearSites" type="button">추가한 공사장 지우기</button></div>
         <p class="note" id="siteNote"></p>
       </div>
     </details>
@@ -549,7 +543,10 @@ const hourLabel=h=>h<12?`오전 ${h}시`:h===12?'낮 12시':`오후 ${h-12}시`;
 
 // ---------- 그래프 ----------
 const adj=G.nodes.map(()=>[]);
-G.edges.forEach((e,i)=>{adj[e.u].push([e.v,i]);adj[e.v].push([e.u,i]);});
+// 펜스 친 재건축 공사장 안의 옛 단지 길(2020년 기준 보행망)은 지나갈 수 없으니 뺌
+const FENCED=osmSites.filter((s,i)=>['dh124','sb22'].includes(G.sites[i].id));
+G.edges.forEach((e,i)=>{const mid=e.s[Math.floor(e.s.length/2)];e.blocked=FENCED.some(s=>inPoly(mid,s.m)&&inPoly(e.s[0],s.m)&&inPoly(e.s[e.s.length-1],s.m));
+  if(e.blocked)return;adj[e.u].push([e.v,i]);adj[e.v].push([e.u,i]);});
 function dijkstra(o,d,cost){
   if(o===d)return [];
   const n=G.nodes.length,dist=new Float64Array(n).fill(Infinity),prev=new Int32Array(n).fill(-1),pe=new Int32Array(n).fill(-1);
@@ -668,14 +665,14 @@ function drawNet(){
   const val=e=>{const x=expoAt(e,state.month);return lay==='sum'?wsum(x):x[lay];};
   const ref=[];G.edges.forEach(e=>MONTHS.concat([11]).forEach(m=>{const x=expoAt(e,m);ref.push(lay==='sum'?wsum(x):x[lay]);}));
   ref.sort((a,b)=>a-b);const top=ref[Math.floor(ref.length*.97)]||1;
-  G.edges.forEach(e=>netLayer.add(M.line(e.g.map(([x,y])=>[y,x]),{color:ramp(val(e)/top),weight:e.hw==='shared'?3.5:2.5,opacity:.85,dash:e.hw==='indoor'?'short':null})));
+  G.edges.forEach(e=>!e.blocked&&netLayer.add(M.line(e.g.map(([x,y])=>[y,x]),{color:ramp(val(e)/top),weight:e.hw==='shared'?3.5:2.5,opacity:.85,dash:e.hw==='indoor'?'short':null})));
 }
 function drawSites(){
   siteLayer.clear();const col='#d9694a';
   osmSites.forEach(s=>siteLayer.add(M.poly([s.ll.map(([x,y])=>[y,x])],{color:col,weight:2,fill:col,fillOpacity:.18,dash:'mid'})));
   userSites.forEach((s,i)=>{const c=s.kind==='circle'?M.circle([s.ll[1],s.ll[0]],s.r,{color:col,weight:2,fill:col,fillOpacity:.25}):M.poly([s.ll.map(([x,y])=>[y,x])],{color:col,weight:2.5,fill:col,fillOpacity:.22});
     M.onShapeClick(c,()=>{if(confirmDel(s)){userSites.splice(i,1);refreshSites();}});siteLayer.add(c);});
-  $('siteNote').textContent=`OpenStreetMap 공사구역 ${osmSites.length}곳 + 직접 추가 ${userSites.length}곳 (직접 추가한 원을 누르면 지워져요)`;
+  $('siteNote').textContent=`공사 중인 곳 ${osmSites.length}곳 반영: ${osmSites.map(s=>s.name.replace(/ 재건축 공사장| 공사장/,'')).join(', ')}`+(userSites.length?` · 직접 추가 ${userSites.length}곳`:'');
 }
 const pinHtml=(lab,col)=>`<div class="pmark" style="background:${col}"><span>${lab}</span></div>`;
 const labelHtml=t=>`<span class="maplabel">${t}</span>`;
@@ -779,7 +776,7 @@ function naverHref(){if(state.o==null||state.d==null)return'https://map.naver.co
   return`https://map.naver.com/p/directions/${ox.toFixed(4)},${oy.toFixed(4)},${on},,/${dx.toFixed(4)},${dy.toFixed(4)},${dn},,/-/walk`;}
 
 // ---------- 검색 ----------
-function nearest([lon,lat]){let b=0,bd=1e18;G.nodes.forEach(([x,y],i)=>{const d=((x-lon)*KX)**2+((y-lat)*KY)**2;if(d<bd){bd=d;b=i;}});return b;}
+function nearest([lon,lat]){let b=0,bd=1e18;G.nodes.forEach(([x,y],i)=>{if(!adj[i].length)return;const d=((x-lon)*KX)**2+((y-lat)*KY)**2;if(d<bd){bd=d;b=i;}});return b;}
 const ORDER={역:0,한강:1,학교:2,공원:3,정류장:4,시설:5,상가:6,아파트:7};
 let active=null,suggIdx=-1,suggList=[];
 const norm=s=>s.replace(/\s|\(.*?\)/g,'').toLowerCase();
@@ -808,7 +805,6 @@ function fitRoute(){if(!last||state.o==null||state.d==null)return;const pts=line
 // ---------- 지도 누르기 ----------
 M.onClick(ll=>{
   if(state.mode==='site'){userSites.push({kind:'circle',ll,m:toM(ll),r:60});refreshSites();return;}
-  if(state.mode==='draw'){drawPts.push(ll);drawPreview();return;}
   if(state.mode==='via'){if(state.o==null||state.d==null)return;state.via.push({node:nearest(ll)});run();return;}
   if(view==='report'){setRLoc(ll,'지도에서 고른 곳');return;}
   const div=document.createElement('div');div.style.cssText='display:flex;gap:6px';
@@ -1085,21 +1081,8 @@ function renderReportList(){
 $('clearReports').onclick=()=>{reports=[];store.set('soom.reports',reports);applyReports();update();toast('제보를 모두 지웠어요');};
 
 
-// ---------- 공사 구역 그리기 ----------
-let drawPts=[];const drawLayer=M.group();drawLayer.show();
 let pendingDel=null;
-function confirmDel(s){if(s.kind==='circle'||pendingDel===s){pendingDel=null;return true;}pendingDel=s;toast('한 번 더 누르면 이 공사 구역이 지워져요');setTimeout(()=>{if(pendingDel===s)pendingDel=null;},3000);return false;}
-function drawPreview(){drawLayer.clear();if(!drawPts.length)return;const ll=drawPts.map(([x,y])=>[y,x]);
-  if(ll.length>=3)drawLayer.add(M.poly([ll],{color:'#d9694a',weight:2.5,fill:'#d9694a',fillOpacity:.2,dash:'mid'}));else drawLayer.add(M.line(ll,{color:'#d9694a',weight:3}));
-  ll.forEach((p,i)=>drawLayer.add(M.html(p,`<div class="vmark" style="border-color:#d9694a">${i+1}</div>`,'center')));
-  $('drawMsg').textContent=drawPts.length<3?`꼭짓점 ${drawPts.length}개 · 3개 이상 찍어 주세요`:`꼭짓점 ${drawPts.length}개`;$('drawDone').disabled=drawPts.length<3;}
-function startDraw(){state.mode='draw';drawPts=[];$('condDlg').close();$('drawBar').hidden=false;setSnap('peek');drawPreview();$('drawMsg').textContent='공사 구역 모서리를 차례로 눌러 주세요';}
-function endDraw(save){if(save&&drawPts.length>=3){const ring=[...drawPts,drawPts[0]];userSites.push({kind:'poly',name:$('drawName').value.trim()||'직접 그린 공사 구역',ll:ring,m:ring.map(toM)});refreshSites();toast('공사 구역을 추가했어요');}
-  state.mode=null;drawPts=[];drawLayer.clear();$('drawBar').hidden=true;setSnap('half');}
-$('drawSite').onclick=startDraw;$('drawDone').onclick=()=>endDraw(true);$('drawCancel').onclick=()=>endDraw(false);
-$('drawUndo').onclick=()=>{drawPts.pop();drawPreview();};
-$('copySites').onclick=async()=>{const txt=JSON.stringify(userSites.filter(s=>s.kind==='poly').map(s=>({name:s.name,ll:s.ll.map(([x,y])=>[+x.toFixed(6),+y.toFixed(6)])})));
-  try{await navigator.clipboard.writeText(txt);toast('좌표를 복사했어요');}catch(e){$('copyOut').hidden=false;$('copyOut').value=txt;}};
+function confirmDel(s){if(s.kind==='circle'||pendingDel===s){pendingDel=null;return true;}pendingDel=s;toast('한 번 더 누르면 지워져요');setTimeout(()=>{if(pendingDel===s)pendingDel=null;},3000);return false;}
 
 // ---------- 시작 ----------
 computeC();applyReports();drawBase();drawSites();setPersona('all');
