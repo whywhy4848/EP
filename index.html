@@ -820,17 +820,11 @@ const stCls=s=>s<25?['st-good','좋음']:s<50?['st-ok','보통']:['st-bad','나�
 function bestHour(m,wd){let best=null;for(let h=9;h<=21;h++){const s=PIC.pts.map(p=>score(p,m,h,wd)).sort((a,b)=>a-b);const v=s[Math.floor(s.length*.1)]+s[Math.floor(s.length*.5)];if(!best||v<best.v)best={h,v};}return best.h;}
 
 // 구간 나누기: 한강 따라 약 450m씩
-const ZONES=(()=>{const xy=PIC.pts.map(p=>toM(p.ll));const cx=xy.reduce((s,q)=>s+q[0],0)/xy.length,cy=xy.reduce((s,q)=>s+q[1],0)/xy.length;
-  let sxx=0,sxy=0,syy=0;xy.forEach(([x,y])=>{sxx+=(x-cx)**2;sxy+=(x-cx)*(y-cy);syy+=(y-cy)**2;});
-  const ang=.5*Math.atan2(2*sxy,sxx-syy),ux=Math.cos(ang),uy=Math.sin(ang);
-  const t=xy.map(([x,y])=>(x-cx)*ux+(y-cy)*uy),t0=Math.min(...t),L=450;
-  const zs=[];PIC.pts.forEach((p,i)=>{const z=Math.floor((t[i]-t0)/L);(zs[z]=zs[z]||{pts:[]}).pts.push(p);});
-  const out=zs.filter(z=>z&&z.pts.length>=6);
-  // 한강공원 안 지명 (OpenStreetMap)
+const ZONES=(()=>{const out=PIC.zones.map(z=>({...z,pts:PIC.pts.filter(p=>p.z===z.id)}));
   const LM=[['동작대교',37.5108,126.9816,' 아래'],['서래섬',37.5082,126.9898,''],['반포안내센터',37.5073,126.9926,' 앞'],['세빛섬',37.5117,126.9953,' 앞'],['반포대교·잠수교',37.5149,126.9963,' 아래'],['달빛무지개분수',37.5114,126.9978,' 광장'],
     ['반포나들목',37.5120,127.0017,' 앞'],['신잠원나들목',37.5168,127.0084,' 앞'],['잠원 수영장',37.5195,127.0099,' 옆'],['잠원나들목',37.5210,127.0131,' 앞'],['한남대교',37.5267,127.0133,' 아래'],['압구정 선착장',37.5266,127.0170,' 앞'],
     ['신사나들목',37.5268,127.0202,' 앞'],['압구정 수변',37.5318,127.0240,''],['성수대교',37.5373,127.0351,' 쪽']].map(([n,la,lo,suf])=>({n,suf,lo,m:toM([lo,la])}));
-  out.forEach(z=>{const lon=z.pts.reduce((s,p)=>s+p.ll[0],0)/z.pts.length,lat=z.pts.reduce((s,p)=>s+p.ll[1],0)/z.pts.length;z.c=[lat,lon];
+  out.forEach(z=>{const [lat,lon]=z.c;
     const [x,y]=toM([lon,lat]);const near=LM.map(l=>({...l,d:Math.hypot(l.m[0]-x,l.m[1]-y)})).sort((a,b)=>a.d-b.d);
     const [p,q]=near;const pair=[p,q].sort((a,b)=>a.lo-b.lo);
     z.name=p.d<0.65*q.d?p.n+p.suf:`${pair[0].n}–${pair[1].n} 사이`;});
@@ -843,7 +837,6 @@ function drawPicnic(){
   picLayer.clear();const m=state.month,h=state.hour,wd=state.weekday;
   const dy=PIC.grid/2/KY,dx=PIC.grid/2/KX;
   const sc=new Map(PIC.pts.map(p=>[p,score(p,m,h,wd)]));
-  PIC.pts.forEach(p=>picLayer.add(M.rect([p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx],{fill:ramp(sc.get(p)/100),fillOpacity:.6})));
   const zs=ZONES.map(z=>{const ss=z.pts.map(p=>sc.get(p)),avg=Math.round(ss.reduce((a,b)=>a+b,0)/ss.length);
     const best=z.pts.reduce((a,b)=>sc.get(b)<sc.get(a)?b:a);const water=z.pts.filter(p=>p.river<60),inner=z.pts.filter(p=>p.river>=60);
     const av=a=>a.length?Math.round(a.map(p=>sc.get(p)).reduce((x,y)=>x+y,0)/a.length):null;
@@ -852,8 +845,12 @@ function drawPicnic(){
     return{z,avg,best,bs:sc.get(best),w:av(water),i:av(inner),main,share:sum?Math.round(tot[main]/sum*100):0,x};}).sort((a,b)=>a.avg-b.avg);
   if(!picSel||!zs.find(o=>o.z===picSel))picSel=zs[0].z;
   const sel=zs.find(o=>o.z===picSel);
-  zs.forEach((o,i)=>{const[cl]=stCls(o.avg);const on=o.z===picSel;picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
-  picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06">★</span>`,'center'));
+  const SC={'st-good':'#3a9a62','st-ok':'#e2a72b','st-bad':'#d2493a'};
+  zs.forEach((o,i)=>{const on=o.z===picSel;
+    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1,opacity:.9,fill:SC[stCls(v)[0]],fillOpacity:on?.62:.42});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
+    o.z.all.forEach(r=>picLayer.add(M.poly([r],{color:on?'#e8b04b':'#24513a',weight:on?3.5:1.4,opacity:on?1:.55})));
+    const[cl]=stCls(o.avg);picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
+  picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06;width:22px;height:22px;font-size:11px">★</span>`,'center'));
   $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
     const side=o.w!=null&&o.i!=null&&Math.abs(o.w-o.i)>=5?(o.w<o.i?`물가 쪽이 더 좋아요 (${o.w} vs 안쪽 ${o.i})`:`안쪽이 더 좋아요 (${o.i} vs 물가 ${o.w})`):'물가·안쪽 비슷해요';
     const why=o.avg<8?'세 가지 다 거의 없어요':`주요인 ${FN2[o.main]} ${o.share}%`;
