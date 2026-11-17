@@ -206,6 +206,8 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
 .maplabel{background:#fff;border-radius:999px;padding:3px 10px;font:700 12px var(--f);color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.18);white-space:nowrap}
 .rank{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--leaf);color:#fff;font-weight:800;font-size:12px;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 .vmark{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #6b7a72;display:grid;place-items:center;font:800 9px var(--f)}
+.lf-center{width:0!important;height:0!important}
+.lf-center>*{transform:translate(-50%,-50%)}
 .foot{font-size:11px;color:#8a9a91;text-align:center;padding:4px 0 2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -408,9 +410,10 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
     <button class="btn" value="close">적용하기</button>
   </form>
 </dialog>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=ed204aa8a5643b3926fa2d687e9ee683&autoload=false"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-async function boot(){
+async function boot(USE_KAKAO){
 const [G,POIS,PIC,ROADS]=await Promise.all(['data/graph.json','data/pois.json','data/picnic.json','data/roads.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json();})));
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const $=id=>document.getElementById(id);
@@ -474,61 +477,107 @@ function plan(month){
   const r={gen:g,clean:best};planCache.set(key,r);return r;
 }
 
-// ---------- 지도 ----------
-const map=L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true,zoomSnap:0.25,minZoom:12,maxZoom:18});
-map.attributionControl.setPrefix(false);
-// 배경: 우리 데이터로 직접 그린 단순한 지도 (한강·공원·도로·지명만)
-map.attributionControl.addAttribution('지도 데이터 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 · 서울 열린데이터광장');
-map.createPane('basemap').style.zIndex=150;map.createPane('baselabels').style.zIndex=450;
-const baseR=L.canvas({pane:'basemap',padding:.5});
-const baseLayer=L.layerGroup().addTo(map),labelLayer=L.layerGroup().addTo(map);
-const RW={5:[7,10,16],4:[5,8,13],3:[4,6.5,10],2:[3,5,8],1:[1.4,2.4,4]}; // 도로 등급별 폭 (줌 13·15·17)
-function roadW(c,z){const[a,b,d]=RW[c];return z<=13?a:z>=17?d:z<=15?a+(b-a)*(z-13)/2:b+(d-b)*(z-15)/2;}
-function drawBasemap(){
-  baseLayer.clearLayers();const z=map.getZoom();
-  L.geoJSON({type:'Feature',geometry:G.river},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#cde3ea',fillOpacity:1}}).addTo(baseLayer);
-  Object.values(G.parks).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#d7ead2',fillOpacity:1}}).addTo(baseLayer));
-  [false,true].forEach(top=>ROADS.forEach(([c,g,br])=>{if(c===1&&z<14)return;const ll=g.map(([x,y])=>[y,x]);const w=roadW(c,z);
-    L.polyline(ll,{renderer:baseR,pane:'basemap',interactive:false,color:top?'#ffffff':(br?'#c7d2cb':'#dde5de'),weight:top?w:w+(c>1?2.2:1.2),lineCap:'round',lineJoin:'round'}).addTo(baseLayer);}));
+// ---------- 지도 (카카오맵, 안 되면 직접 그린 지도) ----------
+const BB=(()=>{let s=90,w=180,n=-90,e=-180;G.nodes.forEach(([x,y])=>{s=Math.min(s,y);n=Math.max(n,y);w=Math.min(w,x);e=Math.max(e,x);});return{s,w,n,e};})();
+const inBox=([lng,lat],p)=>{const dy=(BB.n-BB.s)*p,dx=(BB.e-BB.w)*p;return lat>BB.s-dy&&lat<BB.n+dy&&lng>BB.w-dx&&lng<BB.e+dx;};
+const ANCH={bottom:{x:.5,y:1,lf:[15,34]},center:{x:.5,y:.5},label:{x:0,y:1,lf:[-14,30]}};
+function leafletAdapter(){
+  const map=L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true,zoomSnap:0.25,minZoom:12,maxZoom:18});
+  map.attributionControl.setPrefix(false);
+  map.attributionControl.addAttribution('지도 데이터 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 · 서울 열린데이터광장');
+  map.createPane('basemap').style.zIndex=150;map.createPane('baselabels').style.zIndex=450;
+  const baseR=L.canvas({pane:'basemap',padding:.5}),R=L.canvas({padding:.4});
+  const baseLayer=L.layerGroup().addTo(map),labelLayer=L.layerGroup().addTo(map);
+  const RW={5:[7,10,16],4:[5,8,13],3:[4,6.5,10],2:[3,5,8],1:[1.4,2.4,4]};
+  const roadW=(c,z)=>{const[a,b,d]=RW[c];return z<=13?a:z>=17?d:z<=15?a+(b-a)*(z-13)/2:b+(d-b)*(z-15)/2;};
+  function drawBasemap(){baseLayer.clearLayers();const z=map.getZoom();
+    L.geoJSON({type:'Feature',geometry:G.river},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#cde3ea',fillOpacity:1}}).addTo(baseLayer);
+    Object.values(G.parks).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#d7ead2',fillOpacity:1}}).addTo(baseLayer));
+    [false,true].forEach(top=>ROADS.forEach(([c,g,br])=>{if(c===1&&z<14)return;const w=roadW(c,z);
+      L.polyline(g.map(([x,y])=>[y,x]),{renderer:baseR,pane:'basemap',interactive:false,color:top?'#ffffff':(br?'#c7d2cb':'#dde5de'),weight:top?w:w+(c>1?2.2:1.2),lineCap:'round',lineJoin:'round'}).addTo(baseLayer);}));}
+  function drawLabels(){labelLayer.clearLayers();const z=map.getZoom();
+    POIS.forEach(p=>{const cat=p[1];let show=false,cls='plab';
+      if(cat==='역'&&z>=13&&/역 \(약 위치\)$/.test(p[0])){show=true;cls+=' st';}else if(cat==='한강'&&z>=13&&!p[0].includes('(동쪽)')){show=true;cls+=' hg';}else if((cat==='학교'||cat==='공원')&&z>=15)show=true;
+      if(show)L.marker([p[3],p[2]],{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="${cls}">${p[0].replace(' (약 위치)','')}</span>`,iconSize:null,iconAnchor:[0,8]})}).addTo(labelLayer);});
+    if(z<=15)Object.entries(G.dongs).forEach(([n,g])=>{const c=L.geoJSON({type:'Feature',geometry:g}).getBounds().getCenter();L.marker(c,{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="plab dong">${n}</span>`,iconSize:null,iconAnchor:[24,8]})}).addTo(labelLayer);});}
+  map.on('zoomend',()=>{drawBasemap();drawLabels();});
+  const dashOf=d=>d==='short'?'2 3':d==='mid'?'5 4':d==='long'?'9 7':null;
+  let pop=null;
+  return {kind:'leaflet',
+    init(){map.fitBounds([[BB.s,BB.w],[BB.n,BB.e]]);drawBasemap();drawLabels();},
+    group(){const g=L.layerGroup();return{add:o=>o.addTo(g),clear:()=>g.clearLayers(),show:()=>g.addTo(map),hide:()=>map.removeLayer(g)};},
+    line:(ll,s)=>L.polyline(ll,{renderer:R,interactive:false,color:s.color,weight:s.weight,opacity:s.opacity??1,dashArray:dashOf(s.dash)}),
+    poly:(rings,s)=>L.polygon(rings,{renderer:R,interactive:!!s.click,stroke:s.weight>0,color:s.color,weight:s.weight||0,opacity:s.opacity??1,fillColor:s.fill,fillOpacity:s.fill?(s.fillOpacity??.2):0,fill:!!s.fill,dashArray:dashOf(s.dash)}),
+    rect:(sw,ne,s)=>L.rectangle([sw,ne],{renderer:R,interactive:false,stroke:false,fillColor:s.fill,fillOpacity:s.fillOpacity}),
+    circle:(c,r,s)=>L.circle(c,{renderer:R,radius:r,color:s.color,weight:s.weight,fillColor:s.fill,fillOpacity:s.fillOpacity}),
+    html(ll,html,anchor,onClick){const A=ANCH[anchor];const m=L.marker(ll,{interactive:!!onClick,keyboard:false,icon:L.divIcon({className:'',html,iconSize:anchor==='label'?null:undefined,iconAnchor:A.lf})});
+      if(anchor==='center'){m.options.icon.options.iconSize=null;m.options.icon.options.iconAnchor=undefined;m.options.icon.options.className='lf-center';}
+      if(onClick)m.on('click',e=>{L.DomEvent.stop(e);onClick();});return m;},
+    onShapeClick(o,fn){o.on('click',e=>{L.DomEvent.stop(e);fn();});},
+    popup(ll,el){pop=L.popup({closeButton:false,offset:[0,-2]}).setLatLng(ll).setContent(el).openOn(map);},
+    closePopup(){map.closePopup();},
+    fit(pts,p){if(pts.length)map.fitBounds(L.latLngBounds(pts),{paddingTopLeft:[p.l,p.t],paddingBottomRight:[p.r,p.b],maxZoom:17});},
+    fly(ll,z){map.flyTo(ll,z,{duration:.6});},
+    onClick(fn){map.on('click',e=>fn([e.latlng.lng,e.latlng.lat]));},
+    onDragStart(fn){map.on('dragstart',fn);}};
 }
-function drawLabels(){
-  labelLayer.clearLayers();const z=map.getZoom();
-  POIS.forEach(p=>{const cat=p[1];let show=false,cls='plab';
-    if(cat==='역'&&z>=13&&/역 \(약 위치\)$/.test(p[0])){show=true;cls+=' st';}else if(cat==='한강'&&z>=13&&!p[0].includes('(동쪽)')){show=true;cls+=' hg';}else if(cat==='학교'&&z>=15)show=true;else if(cat==='공원'&&z>=15)show=true;
-    if(!show)return;L.marker([p[3],p[2]],{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="${cls}">${p[0].replace(' (약 위치)','')}</span>`,iconSize:null,iconAnchor:[0,8]})}).addTo(labelLayer);});
-  if(z<=15)Object.entries(G.dongs).forEach(([n,g])=>{const c=L.geoJSON({type:'Feature',geometry:g}).getBounds().getCenter();L.marker(c,{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="plab dong">${n}</span>`,iconSize:null,iconAnchor:[24,8]})}).addTo(labelLayer);});
+function kakaoAdapter(){
+  const K=kakao.maps,el=document.getElementById('map');
+  const map=new K.Map(el,{center:new K.LatLng((BB.s+BB.n)/2,(BB.w+BB.e)/2),level:6});
+  const LL=([lat,lng])=>new K.LatLng(lat,lng);
+  const style=d=>d==='short'?'shortdot':d==='mid'?'shortdash':d==='long'?'dash':'solid';
+  let suppress=0,pop=null;
+  const shapeClick=(o,fn)=>K.event.addListener(o,'click',()=>{suppress=Date.now();fn();});
+  return {kind:'kakao',
+    init(){this.fit([[BB.s,BB.w],[BB.n,BB.e]],{t:0,r:0,b:0,l:0});},
+    group(){const items=[];let vis=false;return{add:o=>{items.push(o);o.setMap(vis?map:null);},clear:()=>{items.forEach(o=>o.setMap(null));items.length=0;},
+      show:()=>{vis=true;items.forEach(o=>o.setMap(map));},hide:()=>{vis=false;items.forEach(o=>o.setMap(null));}};},
+    line:(ll,s)=>new K.Polyline({path:ll.map(LL),strokeWeight:s.weight,strokeColor:s.color,strokeOpacity:s.opacity??1,strokeStyle:style(s.dash),zIndex:s.z||1}),
+    poly:(rings,s)=>new K.Polygon({path:rings.map(r=>r.map(LL)),strokeWeight:s.weight||0,strokeColor:s.color||'#000',strokeOpacity:s.weight?(s.opacity??1):0,strokeStyle:style(s.dash),fillColor:s.fill||'#000',fillOpacity:s.fill?(s.fillOpacity??.2):0}),
+    rect:(sw,ne,s)=>new K.Rectangle({bounds:new K.LatLngBounds(LL(sw),LL(ne)),strokeWeight:0,strokeOpacity:0,fillColor:s.fill,fillOpacity:s.fillOpacity}),
+    circle:(c,r,s)=>new K.Circle({center:LL(c),radius:r,strokeWeight:s.weight,strokeColor:s.color,strokeOpacity:1,fillColor:s.fill,fillOpacity:s.fillOpacity}),
+    html(ll,html,anchor,onClick){const A=ANCH[anchor];const d=document.createElement('div');d.innerHTML=html;if(anchor==='label')d.style.cssText='margin:0 0 22px 16px';
+      if(onClick){d.style.cursor='pointer';d.addEventListener('click',e=>{e.stopPropagation();suppress=Date.now();onClick();});}
+      return new K.CustomOverlay({position:LL(ll),content:d,xAnchor:A.x,yAnchor:A.y,clickable:!!onClick,zIndex:anchor==='bottom'?5:4});},
+    onShapeClick:shapeClick,
+    popup(ll,el){this.closePopup();pop=new K.CustomOverlay({position:LL(ll),content:el,xAnchor:.5,yAnchor:1.25,clickable:true,zIndex:10});pop.setMap(map);},
+    closePopup(){if(pop){pop.setMap(null);pop=null;}},
+    fit(pts,p){if(!pts.length)return;const b=new K.LatLngBounds();pts.forEach(q=>b.extend(LL(q)));map.setBounds(b,p.t,p.r,p.b,p.l);},
+    fly(ll,z){map.setLevel(3,{animate:true});map.panTo(LL(ll));},
+    onClick(fn){K.event.addListener(map,'click',e=>{if(Date.now()-suppress<300)return;fn([e.latLng.getLng(),e.latLng.getLat()]);});},
+    onDragStart(fn){K.event.addListener(map,'dragstart',fn);}};
 }
-map.on('zoomend',()=>{drawBasemap();drawLabels();});
-const renderer=L.canvas({padding:.4});
-const bounds=L.latLngBounds(G.nodes.map(([x,y])=>[y,x]));
-
-const base=L.layerGroup().addTo(map),netLayer=L.layerGroup().addTo(map),siteLayer=L.layerGroup().addTo(map),routeLayer=L.layerGroup(),markLayer=L.layerGroup(),picLayer=L.layerGroup();
-function drawBase(){base.clearLayers();Object.values(G.dongs).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer,interactive:false,style:{color:'#24513a',weight:1.2,opacity:.35,dashArray:'4 5',fill:false}}).addTo(base));}
-function ramp(t){const stops=[[0,'#9ccdb0'],[.35,'#f0c24a'],[.7,'#e0662e'],[1,'#a3122a']];const hex=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.substr(i,2),16));};t=Math.max(0,Math.min(1,t));let i=0;while(i<stops.length-2&&t>stops[i+1][0])i++;const[a,ca]=stops[i],[b,cb]=stops[i+1];const f=(t-a)/(b-a),A=hex(ca),B=hex(cb);return`rgb(${A.map((v,j)=>Math.round(v+(B[j]-v)*f)).join(',')})`;}
+const M=USE_KAKAO?kakaoAdapter():leafletAdapter();
+document.body.dataset.map=M.kind;
+const gj2rings=g=>(g.type==='Polygon'?[g.coordinates]:g.coordinates).map(poly=>poly.map(r=>r.map(([x,y])=>[y,x])));
+const base=M.group(),netLayer=M.group(),siteLayer=M.group(),routeLayer=M.group(),markLayer=M.group(),picLayer=M.group();
+[base,netLayer,siteLayer].forEach(g=>g.show());
+function drawBase(){base.clear();Object.values(G.dongs).forEach(g=>gj2rings(g).forEach(r=>base.add(M.poly(r,{color:'#24513a',weight:1.4,opacity:.4,dash:'mid'}))));}
+function ramp(t){const stops=[[0,'#9ccdb0'],[.35,'#f0c24a'],[.7,'#e0662e'],[1,'#a3122a']];const hex=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.substr(i,2),16));};t=Math.max(0,Math.min(1,t));let i=0;while(i<stops.length-2&&t>stops[i+1][0])i++;const[a,ca]=stops[i],[b,cb]=stops[i+1];const f=(t-a)/(b-a),A=hex(ca),B=hex(cb);return'#'+A.map((v,j)=>Math.round(v+(B[j]-v)*f).toString(16).padStart(2,'0')).join('');}
 function drawNet(){
-  netLayer.clearLayers();const lay=state.layer;if(lay==='none')return;
+  netLayer.clear();const lay=state.layer;if(lay==='none')return;
   const val=e=>{const x=expoAt(e,state.month);return lay==='sum'?wsum(x):x[lay];};
   const ref=[];G.edges.forEach(e=>MONTHS.concat([11]).forEach(m=>{const x=expoAt(e,m);ref.push(lay==='sum'?wsum(x):x[lay]);}));
   ref.sort((a,b)=>a-b);const top=ref[Math.floor(ref.length*.97)]||1;
-  G.edges.forEach(e=>L.polyline(e.g.map(([x,y])=>[y,x]),{renderer,interactive:false,color:ramp(val(e)/top),weight:e.hw==='shared'?3:2.2,opacity:.85,dashArray:e.hw==='indoor'?'2 3':null}).addTo(netLayer));
+  G.edges.forEach(e=>netLayer.add(M.line(e.g.map(([x,y])=>[y,x]),{color:ramp(val(e)/top),weight:e.hw==='shared'?3.5:2.5,opacity:.85,dash:e.hw==='indoor'?'short':null})));
 }
 function drawSites(){
-  siteLayer.clearLayers();const col='#d9694a';
-  osmSites.forEach(s=>L.polygon(s.ll.map(([x,y])=>[y,x]),{renderer,color:col,weight:1.8,fillColor:col,fillOpacity:.18,dashArray:'5 4'}).bindTooltip(s.name==='OSM 공사구역'?'공사장':s.name).addTo(siteLayer));
-  userSites.forEach((s,i)=>L.circle([s.ll[1],s.ll[0]],{renderer,radius:s.r,color:col,weight:2,fillColor:col,fillOpacity:.25}).bindTooltip('직접 추가한 공사장 · 누르면 삭제').on('click',ev=>{L.DomEvent.stop(ev);userSites.splice(i,1);refreshSites();}).addTo(siteLayer));
-  $('siteNote').textContent=`OpenStreetMap 공사구역 ${osmSites.length}곳 + 직접 추가 ${userSites.length}곳`;
+  siteLayer.clear();const col='#d9694a';
+  osmSites.forEach(s=>siteLayer.add(M.poly([s.ll.map(([x,y])=>[y,x])],{color:col,weight:2,fill:col,fillOpacity:.18,dash:'mid'})));
+  userSites.forEach((s,i)=>{const c=M.circle([s.ll[1],s.ll[0]],s.r,{color:col,weight:2,fill:col,fillOpacity:.25});M.onShapeClick(c,()=>{userSites.splice(i,1);refreshSites();});siteLayer.add(c);});
+  $('siteNote').textContent=`OpenStreetMap 공사구역 ${osmSites.length}곳 + 직접 추가 ${userSites.length}곳 (직접 추가한 원을 누르면 지워져요)`;
 }
-function pinIcon(lab,col){return L.divIcon({className:'',html:`<div class="pmark" style="background:${col}"><span>${lab}</span></div>`,iconSize:[30,30],iconAnchor:[15,34]});}
-function labelIcon(t){return L.divIcon({className:'',html:`<span class="maplabel">${t}</span>`,iconSize:null,iconAnchor:[-14,30]});}
+const pinHtml=(lab,col)=>`<div class="pmark" style="background:${col}"><span>${lab}</span></div>`;
+const labelHtml=t=>`<span class="maplabel">${t}</span>`;
 function drawMarks(){
-  markLayer.clearLayers();
-  if(state.o!=null){const[x,y]=G.nodes[state.o];L.marker([y,x],{icon:pinIcon('출','#2e6b4f'),keyboard:false}).addTo(markLayer);}
-  if(state.d!=null){const[x,y]=G.nodes[state.d];L.marker([y,x],{icon:pinIcon('도','#d9694a'),keyboard:false}).addTo(markLayer);
-    const lab=$('inD').value.replace(/ \((약 위치|정류장|피크닉)\)/,'');if(lab)L.marker([y,x],{icon:labelIcon('도착 · '+lab),interactive:false}).addTo(markLayer);}
-  state.via.forEach((v,i)=>{const[x,y]=G.nodes[v.node];L.marker([y,x],{icon:L.divIcon({className:'',html:`<div class="vmark">${i+1}</div>`,iconSize:[18,18],iconAnchor:[9,9]})}).bindTooltip('경유지 '+(i+1)+' · 누르면 삭제').on('click',ev=>{L.DomEvent.stop(ev);state.via.splice(i,1);run();}).addTo(markLayer);});
+  markLayer.clear();
+  if(state.o!=null){const[x,y]=G.nodes[state.o];markLayer.add(M.html([y,x],pinHtml('출','#2e6b4f'),'bottom'));}
+  if(state.d!=null){const[x,y]=G.nodes[state.d];markLayer.add(M.html([y,x],pinHtml('도','#d9694a'),'bottom'));
+    const lab=$('inD').value.replace(/ \((약 위치|정류장|피크닉)\)/,'');if(lab)markLayer.add(M.html([y,x],labelHtml('도착 · '+lab),'label'));}
+  state.via.forEach((v,i)=>{const[x,y]=G.nodes[v.node];markLayer.add(M.html([y,x],`<div class="vmark" title="경유지 ${i+1} · 누르면 삭제">${i+1}</div>`,'center',()=>{state.via.splice(i,1);run();}));});
 }
 function lineOf(edges){const ll=[];edges.forEach(i=>{let g=G.edges[i].g.map(([x,y])=>[y,x]);if(ll.length){const lp=ll[ll.length-1];if(Math.hypot(lp[0]-g[g.length-1][0],lp[1]-g[g.length-1][1])<Math.hypot(lp[0]-g[0][0],lp[1]-g[0][1]))g=g.reverse();}ll.push(...g);});return ll;}
-const fitPad=()=>window.innerWidth>=900?{paddingTopLeft:[440,40],paddingBottomRight:[40,40]}:{paddingTopLeft:[20,64],paddingBottomRight:[20,Math.round(document.getElementById('sheet').getBoundingClientRect().height)+8]};
+const fitPad=()=>window.innerWidth>=900?{l:440,t:40,r:40,b:40}:{l:20,t:64,r:20,b:Math.round(document.getElementById('sheet').getBoundingClientRect().height)+8};
 
 // ---------- 조건 ----------
 const PERSONA={all:{w:{C:1.53,T:1.78,P:1.19},label:'모두 기준',note:'설문 56명의 요인별 (경험 빈도 × 불편 점수) 평균 비율이에요. 교통 배기가스를 가장 자주, 크게 겪었어요.'},
@@ -568,14 +617,14 @@ const fmtM=m=>m>=1000?(m/1000).toFixed(1)+'km':Math.round(m)+'m';
 const mins=m=>Math.max(1,Math.round(m/1.2/60));
 const FN={C:'공사장 먼지',T:'배기가스',P:'꽃가루'};
 function run(){
-  routeLayer.clearLayers();drawMarks();
+  routeLayer.clear();drawMarks();
   const cards=$('cards');$('viaClear').hidden=!state.via.length;
   if(state.o==null||state.d==null){cards.innerHTML='<div class="card" style="align-items:center;text-align:center"><svg style="width:64px;height:64px" aria-hidden="true"><use href="#il-tree"/></svg><p class="note">출발지와 도착지를 검색하거나<br>지도를 눌러 골라 주세요.</p></div>';return;}
   last=plan(state.month);
   if(!last){cards.innerHTML='<p class="note">두 지점이 이어지지 않아요. 다른 곳을 골라 주세요.</p>';return;}
   const g=last.gen,c=last.clean,same=c.edges.join()===g.edges.join()||c.ex>=g.ex*0.995;
-  if(state.show.gen){const ll=lineOf(g.edges);L.polyline(ll,{renderer,color:'#fff',weight:8,opacity:.9}).addTo(routeLayer);L.polyline(ll,{renderer,color:'#5f6f67',weight:4.5,dashArray:'9 7'}).addTo(routeLayer);}
-  if(state.show.clean&&!same){const ll=lineOf(c.edges);L.polyline(ll,{renderer,color:'#fff',weight:11,opacity:.95}).addTo(routeLayer);L.polyline(ll,{renderer,color:'#2e6b4f',weight:6.5}).addTo(routeLayer);}
+  if(state.show.gen){const ll=lineOf(g.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:8,opacity:.9,z:2}));routeLayer.add(M.line(ll,{color:'#5f6f67',weight:4.5,dash:'long',z:3}));}
+  if(state.show.clean&&!same){const ll=lineOf(c.edges);routeLayer.add(M.line(ll,{color:'#ffffff',weight:11,opacity:.95,z:4}));routeLayer.add(M.line(ll,{color:'#2e6b4f',weight:6.5,z:5}));}
   const de=g.ex>0?Math.round((1-c.ex/g.ex)*100):0,dm=mins(c.L)-mins(g.L);
   // 줄어든 요인 중 가장 큰 것
   const cut=['C','T','P'].map(k=>[k,state.w[k]*(g.parts[k]-c.parts[k])]).sort((a,b)=>b[1]-a[1]);
@@ -643,18 +692,17 @@ const QUICK=[['고속터미널역 (약 위치)','잠원한강공원'],['구반�
 $('chips').innerHTML=QUICK.map((q,i)=>`<button class="pill" type="button" data-i="${i}">${q[0].replace(' (약 위치)','')} → ${q[1].replace(' (약 위치)','')}</button>`).join('');
 $('chips').onclick=e=>{const b=e.target.closest('button');if(!b)return;const[o,d]=QUICK[+b.dataset.i];const po=POIS.find(p=>p[0]===o),pd=POIS.find(p=>p[0]===d);if(!po||!pd)return;
   $('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);state.via=[];run();fitRoute();};
-function fitRoute(){if(!last||state.o==null||state.d==null)return;const pts=lineOf(last.gen.edges.concat(last.clean.edges));if(pts.length)map.fitBounds(L.latLngBounds(pts),{...fitPad(),maxZoom:17});}
+function fitRoute(){if(!last||state.o==null||state.d==null)return;const pts=lineOf(last.gen.edges.concat(last.clean.edges));M.fit(pts,fitPad());}
 
 // ---------- 지도 누르기 ----------
-map.on('click',ev=>{
-  const ll=[ev.latlng.lng,ev.latlng.lat];
+M.onClick(ll=>{
   if(state.mode==='site'){userSites.push({kind:'circle',ll,m:toM(ll),r:60});refreshSites();return;}
   if(state.mode==='via'){if(state.o==null||state.d==null)return;state.via.push({node:nearest(ll)});run();return;}
   const div=document.createElement('div');div.style.cssText='display:flex;gap:6px';
   div.innerHTML='<button type="button" style="border:0;border-radius:10px;padding:8px 12px;background:#2e6b4f;color:#fff;font:700 13px var(--f)">여기서 출발</button><button type="button" style="border:0;border-radius:10px;padding:8px 12px;background:#d9694a;color:#fff;font:700 13px var(--f)">여기로 도착</button>';
-  const pop=L.popup({closeButton:false,offset:[0,-2]}).setLatLng(ev.latlng).setContent(div).openOn(map);
+  M.popup([ll[1],ll[0]],div);
   const[bo,bd]=div.querySelectorAll('button');const label='지도에서 고른 곳';
-  const go=w=>{state[w]=nearest(ll);$(w==='o'?'inO':'inD').value=label;state.via=[];map.closePopup(pop);if(view!=='route')location.hash='#route';else run();};
+  const go=w=>{state[w]=nearest(ll);$(w==='o'?'inO':'inD').value=label;state.via=[];M.closePopup();if(view!=='route')location.hash='#route';else run();};
   bo.onclick=()=>go('o');bd.onclick=()=>go('d');
 });
 function setMode(m){state.mode=state.mode===m?null:m;
@@ -681,10 +729,10 @@ function spotIcon(p,x){if(p.river<70)return['il-river','#e7f3f6'];if(x.P>0.15)re
 function bestHour(m,wd){let best=null;for(let h=9;h<=21;h++){const s=PIC.pts.map(p=>score(p,m,h,wd)).sort((a,b)=>a-b);const v=s[0]+s[Math.floor(s.length*.1)];if(!best||v<best.v)best={h,v};}return best.h;}
 let picSel=0,picBest=[];
 function drawPicnic(){
-  picLayer.clearLayers();const m=state.month,h=state.hour,wd=state.weekday;
+  picLayer.clear();const m=state.month,h=state.hour,wd=state.weekday;
   const dy=PIC.grid/2/KY,dx=PIC.grid/2/KX;
   const scored=PIC.pts.map(p=>({p,s:score(p,m,h,wd),x:picX(p,m,h,wd)}));
-  scored.forEach(({p,s})=>L.rectangle([[p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx]],{renderer,stroke:false,fillColor:ramp(s/100),fillOpacity:.62}).bindTooltip(`위험도 ${s}`).addTo(picLayer));
+  scored.forEach(({p,s})=>picLayer.add(M.rect([p.ll[1]-dy,p.ll[0]-dx],[p.ll[1]+dy,p.ll[0]+dx],{fill:ramp(s/100),fillOpacity:.62})));
   const asc=[...scored].sort((a,b)=>a.s-b.s||a.p.T-b.p.T);
   picBest=pickSpread(asc.map(o=>o.p),2,350).map(p=>scored.find(o=>o.p===p));
   const worst=[...scored].sort((a,b)=>b.s-a.s)[0];
@@ -695,9 +743,9 @@ function drawPicnic(){
     return`<div class="spot ${!bad&&i===picSel?'sel':''}"><button class="go" type="button" data-i="${i}" aria-label="${placeName(o.p)} 지도에서 보기"><span class="ic" style="background:${bg}"><svg aria-hidden="true"><use href="#${ic}"/></svg></span>
       <span class="bd"><b>${bad?'피하면 좋은 곳 · ':''}${placeName(o.p)}</b><span>${why(o)} · 물가 ${o.p.river}m</span></span></button>
       <span class="status ${cl}">${tx} ${o.s}</span></div>`;}).join('');
-  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,o=list[i];if(i<picBest.length){picSel=i;drawPicnic();}map.flyTo([o.p.ll[1],o.p.ll[0]],16.5,{duration:.6});});
-  picBest.forEach((o,i)=>{L.marker([o.p.ll[1],o.p.ll[0]],{icon:L.divIcon({className:'',html:`<span class="rank" style="${i===picSel?'background:#e8b04b;color:#3a2a06':''}">${i+1}</span>`,iconSize:[26,26],iconAnchor:[13,13]})}).addTo(picLayer);
-    if(i===picSel)L.marker([o.p.ll[1],o.p.ll[0]],{icon:labelIcon(placeName(o.p)),interactive:false}).addTo(picLayer);});
+  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,o=list[i];if(i<picBest.length){picSel=i;drawPicnic();}M.fly([o.p.ll[1],o.p.ll[0]],16.5);});
+  picBest.forEach((o,i)=>{picLayer.add(M.html([o.p.ll[1],o.p.ll[0]],`<span class="rank" style="${i===picSel?'background:#e8b04b;color:#3a2a06':''}">${i+1}</span>`,'center',()=>{picSel=i;drawPicnic();}));
+    if(i===picSel)picLayer.add(M.html([o.p.ll[1],o.p.ll[0]],labelHtml(placeName(o.p)),'label'));});
   // 좋은 시간
   const bh=bestHour(m,wd);$('picBest').textContent=hourLabel(bh);
   $('picBestSub').textContent=`${m}월 ${wd?'평일':'주말'} · ${bh>=18||bh<7?'공사 끝나고 출퇴근도 지난 시간':bh<17?'출퇴근 피한 한낮':'출퇴근 시간 전후'}`;
@@ -737,15 +785,15 @@ function renderHome(){
 // ---------- 화면 전환 ----------
 let view='home';
 function update(){renderCond();drawNet();if(view==='route')run();else if(view==='picnic')drawPicnic();else if(view==='month'){monthChart();picChart();}else renderHome();}
-const parkBounds=L.latLngBounds(PIC.pts.map(p=>[p.ll[1],p.ll[0]]));
+const parkPts=PIC.pts.map(p=>[p.ll[1],p.ll[0]]);
 function setView(v){
   view=['route','picnic','month'].includes(v)?v:'home';document.body.dataset.view=view;setSnap('half');
   document.querySelectorAll('.tabbar a').forEach(a=>{if(a.dataset.tab===view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
-  [routeLayer,markLayer,picLayer].forEach(l=>map.removeLayer(l));
-  if(view==='route'||view==='month'){routeLayer.addTo(map);markLayer.addTo(map);}
-  if(view==='picnic')picLayer.addTo(map);
+  [routeLayer,markLayer,picLayer].forEach(l=>l.hide());
+  if(view==='route'||view==='month'){routeLayer.show();markLayer.show();}
+  if(view==='picnic')picLayer.show();
   update();$('scroll').scrollTop=0;
-  setTimeout(()=>{if(view==='picnic')map.fitBounds(parkBounds,{...fitPad()});else if(view==='route')fitRoute();else map.fitBounds(bounds,{...fitPad()});},280);
+  setTimeout(()=>{if(view==='picnic')M.fit(parkPts,fitPad());else if(view==='route')fitRoute();else M.fit([[BB.s,BB.w],[BB.n,BB.e]],fitPad());},280);
 }
 window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
 // ---------- 끌어 올리는 시트 (모바일) ----------
@@ -775,7 +823,7 @@ function collapseSheet(){setSnap('peek');}
   sc.addEventListener('touchend',()=>{if(sy===null)return;sy=null;if(sheet.classList.contains('dragging')){sheet.classList.remove('dragging');const h=sheet.getBoundingClientRect().height;setSnap(h<SNAP.half()-60?'peek':'half');}});
   window.addEventListener('resize',()=>{if(isMobile())setSnap(snap);else sheet.style.removeProperty('--sheet-h');});
   // 지도를 만지면 시트를 내려서 지도를 넓게
-  map.on('dragstart',()=>{if(isMobile()&&snap!=='peek')setSnap('peek');});
+  M.onDragStart(()=>{if(isMobile()&&snap!=='peek')setSnap('peek');});
 })();
 setSnap('half');
 
@@ -792,7 +840,7 @@ $('geo').onclick=()=>{
   if(!navigator.geolocation){note('이 브라우저는 위치를 지원하지 않아요.');return;}
   note('위치 찾는 중…');
   navigator.geolocation.getCurrentPosition(pos=>{const ll=[pos.coords.longitude,pos.coords.latitude];
-    if(!bounds.pad(0.15).contains([ll[1],ll[0]])){note('지금 위치가 반포·잠원 밖이에요. 검색으로 골라 주세요.');return;}
+    if(!inBox(ll,0.15)){note('지금 위치가 반포·잠원 밖이에요. 검색으로 골라 주세요.');return;}
     state.o=nearest(ll);state.via=[];$('inO').value='내 위치';note('');run();fitRoute();},()=>note('위치 권한을 허용해야 쓸 수 있어요.'),{enableHighAccuracy:true,timeout:10000});
 };
 
@@ -801,11 +849,12 @@ computeC();drawBase();drawSites();setPersona('all');
 $('hour').value=state.hour;$('day').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.weekday));
 mEl.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.month));whenNote();
 {const po=POIS.find(p=>p[0]==='고속터미널역 (약 위치)'),pd=POIS.find(p=>p[0]==='잠원한강공원');$('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);last=plan(state.month);}
-map.fitBounds(bounds);drawBasemap();drawLabels();
+M.init();
 setView(location.hash.slice(1));
 $('loading').remove();
 }
-boot().catch(e=>{document.getElementById('loading').textContent='데이터를 불러오지 못했어요: '+e.message;console.error(e);});
+function startApp(){return new Promise((res,rej)=>{if(window.kakao&&kakao.maps&&kakao.maps.load)kakao.maps.load(()=>boot(true).then(res,rej));else boot(false).then(res,rej);});}
+startApp().catch(e=>{document.getElementById('loading').textContent='데이터를 불러오지 못했어요: '+e.message;console.error(e);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
 </script>
 </body></html>
