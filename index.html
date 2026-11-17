@@ -825,11 +825,17 @@ const ZONES=(()=>{const xy=PIC.pts.map(p=>toM(p.ll));const cx=xy.reduce((s,q)=>s
   const ang=.5*Math.atan2(2*sxy,sxx-syy),ux=Math.cos(ang),uy=Math.sin(ang);
   const t=xy.map(([x,y])=>(x-cx)*ux+(y-cy)*uy),t0=Math.min(...t),L=450;
   const zs=[];PIC.pts.forEach((p,i)=>{const z=Math.floor((t[i]-t0)/L);(zs[z]=zs[z]||{pts:[]}).pts.push(p);});
-  const out=zs.filter(z=>z&&z.pts.length>=6);const cnt={};
+  const out=zs.filter(z=>z&&z.pts.length>=6);
+  // 한강공원 안 지명 (OpenStreetMap)
+  const LM=[['동작대교',37.5108,126.9816,' 아래'],['서래섬',37.5082,126.9898,''],['반포안내센터',37.5073,126.9926,' 앞'],['세빛섬',37.5117,126.9953,' 앞'],['반포대교·잠수교',37.5149,126.9963,' 아래'],['달빛무지개분수',37.5114,126.9978,' 광장'],
+    ['반포나들목',37.5120,127.0017,' 앞'],['신잠원나들목',37.5168,127.0084,' 앞'],['잠원 수영장',37.5195,127.0099,' 옆'],['잠원나들목',37.5210,127.0131,' 앞'],['한남대교',37.5267,127.0133,' 아래'],['압구정 선착장',37.5266,127.0170,' 앞'],
+    ['신사나들목',37.5268,127.0202,' 앞'],['압구정 수변',37.5318,127.0240,''],['성수대교',37.5373,127.0351,' 쪽']].map(([n,la,lo,suf])=>({n,suf,lo,m:toM([lo,la])}));
   out.forEach(z=>{const lon=z.pts.reduce((s,p)=>s+p.ll[0],0)/z.pts.length,lat=z.pts.reduce((s,p)=>s+p.ll[1],0)/z.pts.length;z.c=[lat,lon];
-    const park=z.pts[0].park.replace('한강공원','');cnt[park]=(cnt[park]||0)+1;
-    const [x,y]=toM([lon,lat]);const near=POIS.filter(q=>(q[1]==='한강'||q[1]==='공원')&&!/한강공원/.test(q[0])).map(q=>{const[qx,qy]=toM([q[2],q[3]]);return{n:q[0],d:Math.hypot(qx-x,qy-y)};}).sort((a,b)=>a.d-b.d)[0];
-    z.name=`${park} ${cnt[park]}구간${near&&near.d<350?' · '+near.n+' 근처':''}`;});
+    const [x,y]=toM([lon,lat]);const near=LM.map(l=>({...l,d:Math.hypot(l.m[0]-x,l.m[1]-y)})).sort((a,b)=>a.d-b.d);
+    const [p,q]=near;const pair=[p,q].sort((a,b)=>a.lo-b.lo);
+    z.name=p.d<0.65*q.d?p.n+p.suf:`${pair[0].n}–${pair[1].n} 사이`;});
+  const groups={};out.forEach(z=>(groups[z.name]=groups[z.name]||[]).push(z));
+  Object.values(groups).forEach(g=>{if(g.length<2)return;g.sort((a,b)=>a.c[1]-b.c[1]);const tags=g.length===2?['서쪽','동쪽']:['서쪽','가운데','동쪽'];g.forEach((z,i)=>z.name+=` (${tags[i]||i+1})`);});
   return out;})();
 let picSel=null;
 const FN2={C:'공사장 먼지',T:'올림픽대로·다리 배기가스',P:'꽃가루'};
@@ -846,7 +852,7 @@ function drawPicnic(){
     return{z,avg,best,bs:sc.get(best),w:av(water),i:av(inner),main,share:sum?Math.round(tot[main]/sum*100):0,x};}).sort((a,b)=>a.avg-b.avg);
   if(!picSel||!zs.find(o=>o.z===picSel))picSel=zs[0].z;
   const sel=zs.find(o=>o.z===picSel);
-  zs.forEach((o,i)=>{const[cl]=stCls(o.avg);const on=o.z===picSel;picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name.split(' · ')[0]} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
+  zs.forEach((o,i)=>{const[cl]=stCls(o.avg);const on=o.z===picSel;picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
   picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06">★</span>`,'center'));
   $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
     const side=o.w!=null&&o.i!=null&&Math.abs(o.w-o.i)>=5?(o.w<o.i?`물가 쪽이 더 좋아요 (${o.w} vs 안쪽 ${o.i})`:`안쪽이 더 좋아요 (${o.i} vs 물가 ${o.w})`):'물가·안쪽 비슷해요';
@@ -858,9 +864,9 @@ function drawPicnic(){
   $('picBestSub').textContent=`${m}월 ${wd?'평일':'주말'} · ${bh>=18||bh<7?'공사 끝나고 출퇴근도 지난 시간':bh<17?'출퇴근 피한 한낮':'출퇴근 시간 전후'}`;
   $('picTitle').textContent='구간별 숨 점수';
   const items=[];const pv=sel.x.P;if(pv>0.1)items.push('마스크','안경');else if(sel.main==='T'||sel.main==='C')items.push('마스크');
-  $('bring').innerHTML=`<span>${sel.z.name.split(' · ')[0]} 챙길 것</span>`+(items.length?items.map(t=>`<span class="pill">${t}</span>`).join(''):'<span class="pill">특별히 없어요</span>');
-  $('picGo').textContent=`${sel.z.name.split(' · ')[0]} 명당(★)으로 숨 편한 길 찾기`;
-  $('picGo').onclick=()=>{state.d=sel.best.node;state.via=[];$('inD').value=sel.z.name.split(' · ')[0]+' 명당 (피크닉)';location.hash='#route';if(state.o==null)setTimeout(()=>$('inO').focus(),300);};
+  $('bring').innerHTML=`<span>${sel.z.name} 챙길 것</span>`+(items.length?items.map(t=>`<span class="pill">${t}</span>`).join(''):'<span class="pill">특별히 없어요</span>');
+  $('picGo').textContent=`${sel.z.name} 명당(★)까지 숨 편한 길`;
+  $('picGo').onclick=()=>{state.d=sel.best.node;state.via=[];$('inD').value=sel.z.name+' (피크닉)';location.hash='#route';if(state.o==null)setTimeout(()=>$('inO').focus(),300);};
 }
 function picChart(){
   const rows=[];for(let m=1;m<=12;m++){const s=PIC.pts.map(p=>score(p,m,state.hour,state.weekday));rows.push({m,a:s.reduce((a,b)=>a+b,0)/s.length,b:Math.min(...s)});}
@@ -884,7 +890,7 @@ function renderHome(){
   $('tCon').textContent=`${osmSites.length+userSites.length}곳 · ${workOn()?'작업 중':'쉬는 중'}`;
   const bh=bestHour(state.month,state.weekday);
   const top=PIC.pts.map(p=>({p,s:score(p,state.month,bh,state.weekday)})).sort((a,b)=>a.s-b.s)[0];
-  $('recoTitle').textContent=`${hourLabel(bh)}, ${placeName(top.p).replace(' 근처','')} 쪽이 가장 숨 편해요`;
+  const zz=ZONES.find(z=>z.pts.includes(top.p));$('recoTitle').textContent=`${hourLabel(bh)}, ${zz?zz.name:placeName(top.p)}이 가장 숨 편해요`;
   $('recoSub').textContent=state.persona==='alg'?'꽃가루 민감 기준으로 고른 시간과 자리예요':'설문 응답자 평균 기준으로 고른 시간과 자리예요';
 }
 
