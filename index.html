@@ -847,8 +847,8 @@ function drawPicnic(){
   const sel=zs.find(o=>o.z===picSel);
   const SC={'st-good':'#3a9a62','st-ok':'#e2a72b','st-bad':'#d2493a'};
   zs.forEach((o,i)=>{const on=o.z===picSel;
-    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1,opacity:.9,fill:SC[stCls(v)[0]],fillOpacity:on?.62:.42});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
-    o.z.all.forEach(r=>picLayer.add(M.poly([r],{color:on?'#e8b04b':'#24513a',weight:on?3.5:1.4,opacity:on?1:.55})));
+    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1.2,opacity:.8,dash:'short',fill:SC[stCls(v)[0]],fillOpacity:on?.66:.46});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
+    o.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#ffffff',weight:on?7:5,opacity:1}));picLayer.add(M.poly([r],{color:on?'#e8a21f':'#1d4430',weight:on?3.5:2,opacity:on?1:.85}));});
     const[cl]=stCls(o.avg);picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
   picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06;width:22px;height:22px;font-size:11px">★</span>`,'center'));
   $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
