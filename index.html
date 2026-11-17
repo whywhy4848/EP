@@ -25,14 +25,18 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-.leaflet-tile-pane{filter:saturate(.55) brightness(1.05) contrast(.92) hue-rotate(-8deg)}
+.plab{font:600 11.5px var(--f);color:#5d6f65;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;pointer-events:none}
+.plab.st{color:#1d4430;font-weight:700;font-size:12px;padding-left:12px;position:relative}
+.plab.st::before{content:"";position:absolute;left:0;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#fff;border:2.5px solid #24513a;box-sizing:border-box}
+.plab.hg{color:#3c7790;font-size:12.5px}
+.plab.dong{color:#8a9a91;font-size:11px;font-weight:500;letter-spacing:.08em}
 html,body{height:100%;margin:0}
 body{font:15px/1.5 var(--f);color:var(--ink);background:var(--bg);overflow:hidden;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2.5px solid var(--leaf);outline-offset:2px}
-#map{position:fixed;inset:0;background:#eef2ec;z-index:0}
-.leaflet-container{font:inherit;background:#eef2ec}
+#map{position:fixed;inset:0;background:#eff3ec;z-index:0}
+.leaflet-container{font:inherit;background:#eff3ec}
 .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.8)!important}
 .leaflet-top.leaflet-left{top:auto;bottom:0}
 
@@ -360,7 +364,7 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
         <p><b>숨 편한 경로</b>는 링크 비용 = 길이 × (1 + 가중치 × 노출)인 최단경로예요. 가중치 배율을 0~16배로 바꿔 찾은 후보 중, 최단거리의 1.3배 안에서 노출이 가장 적은 길을 골라요.</p>
         <p><b>노출</b> 공사장 exp(−거리/75m), 평일 7–18시 작업 가정(그 외 0.15). 교통 배기가스 간선 등급 × exp(−거리/50m), 출퇴근 ×1.3. 꽃가루 그 달 비산 수목(상 1, 중 0.5) 커널합 exp(−거리/30m). 건물 안 길은 20%.</p>
         <p><b>가중치</b> 우리 설문(2026.9.30–10.1, 56명)의 요인별 경험 빈도 × 불편 점수. 전체: 공사 1.53 · 교통 1.78 · 꽃가루 1.19. 꽃가루 민감(꽃가루 불편 4–5점, 14명): 1.09 · 0.90 · 2.51. 응답자가 20대에 몰려 있어 대표성 한계가 있어요.</p>
-        <p><b>데이터</b> 서울시 자치구별 도보 네트워크(서초구), 서울시 가로수·공원/사유지 수목(5,502그루), OpenStreetMap(한강공원 산책로·간선도로·공사구역·장소), 배경 지도 OpenStreetMap. 역 위치는 대략값이에요.</p>
+        <p><b>데이터</b> 서울시 자치구별 도보 네트워크(서초구), 서울시 가로수·공원/사유지 수목(5,502그루), OpenStreetMap(한강공원 산책로·간선도로·공사구역·장소), 배경 지도는 OpenStreetMap 도로 자료로 직접 그림. 역 위치는 대략값이에요.</p>
       </details>
     </section>
 
@@ -406,7 +410,7 @@ details p{font-size:12.5px;color:var(--sub);margin:8px 0 0;line-height:1.6}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 async function boot(){
-const [G,POIS,PIC]=await Promise.all(['data/graph.json','data/pois.json','data/picnic.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json();})));
+const [G,POIS,PIC,ROADS]=await Promise.all(['data/graph.json','data/pois.json','data/picnic.json','data/roads.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json();})));
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const $=id=>document.getElementById(id);
 
@@ -472,8 +476,28 @@ function plan(month){
 // ---------- 지도 ----------
 const map=L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true,zoomSnap:0.25,minZoom:12,maxZoom:18});
 map.attributionControl.setPrefix(false);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,
-  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 · 서울 열린데이터광장'}).addTo(map);
+// 배경: 우리 데이터로 직접 그린 단순한 지도 (한강·공원·도로·지명만)
+map.attributionControl.addAttribution('지도 데이터 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 · 서울 열린데이터광장');
+map.createPane('basemap').style.zIndex=150;map.createPane('baselabels').style.zIndex=450;
+const baseR=L.canvas({pane:'basemap',padding:.5});
+const baseLayer=L.layerGroup().addTo(map),labelLayer=L.layerGroup().addTo(map);
+const RW={5:[7,10,16],4:[5,8,13],3:[4,6.5,10],2:[3,5,8],1:[1.4,2.4,4]}; // 도로 등급별 폭 (줌 13·15·17)
+function roadW(c,z){const[a,b,d]=RW[c];return z<=13?a:z>=17?d:z<=15?a+(b-a)*(z-13)/2:b+(d-b)*(z-15)/2;}
+function drawBasemap(){
+  baseLayer.clearLayers();const z=map.getZoom();
+  L.geoJSON({type:'Feature',geometry:G.river},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#cde3ea',fillOpacity:1}}).addTo(baseLayer);
+  Object.values(G.parks).forEach(g=>L.geoJSON({type:'Feature',geometry:g},{renderer:baseR,pane:'basemap',interactive:false,style:{stroke:false,fillColor:'#d7ead2',fillOpacity:1}}).addTo(baseLayer));
+  [false,true].forEach(top=>ROADS.forEach(([c,g,br])=>{if(c===1&&z<14)return;const ll=g.map(([x,y])=>[y,x]);const w=roadW(c,z);
+    L.polyline(ll,{renderer:baseR,pane:'basemap',interactive:false,color:top?'#ffffff':(br?'#c7d2cb':'#dde5de'),weight:top?w:w+(c>1?2.2:1.2),lineCap:'round',lineJoin:'round'}).addTo(baseLayer);}));
+}
+function drawLabels(){
+  labelLayer.clearLayers();const z=map.getZoom();
+  POIS.forEach(p=>{const cat=p[1];let show=false,cls='plab';
+    if(cat==='역'&&z>=13&&/역 \(약 위치\)$/.test(p[0])){show=true;cls+=' st';}else if(cat==='한강'&&z>=13&&!p[0].includes('(동쪽)')){show=true;cls+=' hg';}else if(cat==='학교'&&z>=15)show=true;else if(cat==='공원'&&z>=15)show=true;
+    if(!show)return;L.marker([p[3],p[2]],{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="${cls}">${p[0].replace(' (약 위치)','')}</span>`,iconSize:null,iconAnchor:[0,8]})}).addTo(labelLayer);});
+  if(z<=15)Object.entries(G.dongs).forEach(([n,g])=>{const c=L.geoJSON({type:'Feature',geometry:g}).getBounds().getCenter();L.marker(c,{pane:'baselabels',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<span class="plab dong">${n}</span>`,iconSize:null,iconAnchor:[24,8]})}).addTo(labelLayer);});
+}
+map.on('zoomend',()=>{drawBasemap();drawLabels();});
 const renderer=L.canvas({padding:.4});
 const bounds=L.latLngBounds(G.nodes.map(([x,y])=>[y,x]));
 
@@ -749,7 +773,7 @@ computeC();drawBase();drawSites();setPersona('all');
 $('hour').value=state.hour;$('day').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.weekday));
 mEl.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.v===state.month));whenNote();
 {const po=POIS.find(p=>p[0]==='고속터미널역 (약 위치)'),pd=POIS.find(p=>p[0]==='잠원한강공원');$('inO').value=po[0];$('inD').value=pd[0];state.o=nearest([po[2],po[3]]);state.d=nearest([pd[2],pd[3]]);last=plan(state.month);}
-map.fitBounds(bounds);
+map.fitBounds(bounds);drawBasemap();drawLabels();
 setView(location.hash.slice(1));
 $('loading').remove();
 }
