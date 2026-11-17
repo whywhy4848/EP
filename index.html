@@ -847,9 +847,10 @@ function drawPicnic(){
   const sel=zs.find(o=>o.z===picSel);
   const SC={'st-good':'#3a9a62','st-ok':'#e2a72b','st-bad':'#d2493a'};
   zs.forEach((o,i)=>{const on=o.z===picSel;
-    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1.2,opacity:.8,dash:'short',fill:SC[stCls(v)[0]],fillOpacity:on?.66:.46});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
-    o.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#ffffff',weight:on?7:5,opacity:1}));picLayer.add(M.poly([r],{color:on?'#e8a21f':'#1d4430',weight:on?3.5:2,opacity:on?1:.85}));});
+    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1.2,opacity:.8,dash:'short',fill:SC[stCls(v)[0]],fillOpacity:on?.72:.34});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
+    if(!on)o.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#ffffff',weight:5,opacity:1}));picLayer.add(M.poly([r],{color:'#1d4430',weight:2,opacity:.8}));});
     const[cl]=stCls(o.avg);picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
+  sel.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#1b2b22',weight:12,opacity:.28}));picLayer.add(M.poly([r],{color:'#ffffff',weight:8,opacity:1}));picLayer.add(M.poly([r],{color:'#f0a417',weight:5,opacity:1}));});
   picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06;width:22px;height:22px;font-size:11px">★</span>`,'center'));
   $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
     const side=o.w!=null&&o.i!=null&&Math.abs(o.w-o.i)>=5?(o.w<o.i?`물가 쪽이 더 좋아요 (${o.w} vs 안쪽 ${o.i})`:`안쪽이 더 좋아요 (${o.i} vs 물가 ${o.w})`):'물가·안쪽 비슷해요';
