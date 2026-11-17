@@ -597,7 +597,7 @@ function leafletAdapter(){
     init(){map.fitBounds([[BB.s,BB.w],[BB.n,BB.e]]);drawBasemap();drawLabels();},
     group(){const g=L.layerGroup();return{add:o=>o.addTo(g),clear:()=>g.clearLayers(),show:()=>g.addTo(map),hide:()=>map.removeLayer(g)};},
     line:(ll,s)=>L.polyline(ll,{renderer:R,interactive:false,color:s.color,weight:s.weight,opacity:s.opacity??1,dashArray:dashOf(s.dash)}),
-    poly:(rings,s)=>L.polygon(rings,{renderer:R,interactive:!!s.click,stroke:s.weight>0,color:s.color,weight:s.weight||0,opacity:s.opacity??1,fillColor:s.fill,fillOpacity:s.fill?(s.fillOpacity??.2):0,fill:!!s.fill,dashArray:dashOf(s.dash)}),
+    poly:(rings,s)=>L.polygon(rings,{renderer:R,interactive:!!s.fill,stroke:s.weight>0,color:s.color,weight:s.weight||0,opacity:s.opacity??1,fillColor:s.fill,fillOpacity:s.fill?(s.fillOpacity??.2):0,fill:!!s.fill,dashArray:dashOf(s.dash)}),
     rect:(sw,ne,s)=>L.rectangle([sw,ne],{renderer:R,interactive:false,stroke:false,fillColor:s.fill,fillOpacity:s.fillOpacity}),
     circle:(c,r,s)=>L.circle(c,{renderer:R,radius:r,color:s.color,weight:s.weight,fillColor:s.fill,fillOpacity:s.fillOpacity}),
     html(ll,html,anchor,onClick){const A=ANCH[anchor];const m=L.marker(ll,{interactive:!!onClick,keyboard:false,icon:L.divIcon({className:'',html,iconSize:anchor==='label'?null:undefined,iconAnchor:A.lf})});
@@ -623,7 +623,7 @@ function kakaoAdapter(){
     group(){const items=[];let vis=false;return{add:o=>{items.push(o);o.setMap(vis?map:null);},clear:()=>{items.forEach(o=>o.setMap(null));items.length=0;},
       show:()=>{vis=true;items.forEach(o=>o.setMap(map));},hide:()=>{vis=false;items.forEach(o=>o.setMap(null));}};},
     line:(ll,s)=>new K.Polyline({path:ll.map(LL),strokeWeight:s.weight,strokeColor:s.color,strokeOpacity:s.opacity??1,strokeStyle:style(s.dash),zIndex:s.z||1}),
-    poly:(rings,s)=>new K.Polygon({path:rings.map(r=>r.map(LL)),strokeWeight:s.weight||0,strokeColor:s.color||'#000',strokeOpacity:s.weight?(s.opacity??1):0,strokeStyle:style(s.dash),fillColor:s.fill||'#000',fillOpacity:s.fill?(s.fillOpacity??.2):0}),
+    poly:(rings,s)=>new K.Polygon({path:rings.map(r=>r.map(LL)),strokeWeight:s.weight||0,strokeColor:s.color||'#000',strokeOpacity:s.weight?(s.opacity??1):0,strokeStyle:style(s.dash),fillColor:s.fill||'#000',fillOpacity:s.fill?(s.fillOpacity??.2):0,zIndex:s.z||1}),
     rect:(sw,ne,s)=>new K.Rectangle({bounds:new K.LatLngBounds(LL(sw),LL(ne)),strokeWeight:0,strokeOpacity:0,fillColor:s.fill,fillOpacity:s.fillOpacity}),
     circle:(c,r,s)=>new K.Circle({center:LL(c),radius:r,strokeWeight:s.weight,strokeColor:s.color,strokeOpacity:1,fillColor:s.fill,fillOpacity:s.fillOpacity}),
     html(ll,html,anchor,onClick){const A=ANCH[anchor];const d=document.createElement('div');d.innerHTML=html;if(anchor==='label')d.style.cssText='margin:0 0 22px 16px';
@@ -833,6 +833,7 @@ const ZONES=(()=>{const out=PIC.zones.map(z=>({...z,pts:PIC.pts.filter(p=>p.z===
   return out;})();
 let picSel=null;
 const FN2={C:'공사장 먼지',T:'올림픽대로·다리 배기가스',P:'꽃가루'};
+function fitZone(z){const wasFull=isMobile()&&snap==='full';if(wasFull)setSnap('half');setTimeout(()=>M.fit(z.all.flat(),fitPad()),wasFull?320:0);}
 function drawPicnic(){
   picLayer.clear();const m=state.month,h=state.hour,wd=state.weekday;
   const dy=PIC.grid/2/KY,dx=PIC.grid/2/KX;
@@ -847,17 +848,17 @@ function drawPicnic(){
   const sel=zs.find(o=>o.z===picSel);
   const SC={'st-good':'#3a9a62','st-ok':'#e2a72b','st-bad':'#d2493a'};
   zs.forEach((o,i)=>{const on=o.z===picSel;
-    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1.2,opacity:.8,dash:'short',fill:SC[stCls(v)[0]],fillOpacity:on?.72:.34});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();});picLayer.add(sh);});});
-    if(!on)o.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#ffffff',weight:5,opacity:1}));picLayer.add(M.poly([r],{color:'#1d4430',weight:2,opacity:.8}));});
-    const[cl]=stCls(o.avg);picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();M.fly(o.z.c,16);}));});
-  sel.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#1b2b22',weight:12,opacity:.28}));picLayer.add(M.poly([r],{color:'#ffffff',weight:8,opacity:1}));picLayer.add(M.poly([r],{color:'#f0a417',weight:5,opacity:1}));});
+    [['water',o.w],['inner',o.i]].forEach(([k,v])=>{if(v==null)return;o.z[k].forEach(r=>{const sh=M.poly([r],{color:'#ffffff',weight:1.2,opacity:.8,dash:'short',fill:SC[stCls(v)[0]],fillOpacity:on?.72:.34});M.onShapeClick(sh,()=>{picSel=o.z;drawPicnic();fitZone(o.z);});picLayer.add(sh);});});
+    if(!on)o.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#ffffff',weight:4,opacity:.9,z:3}));picLayer.add(M.poly([r],{color:'#1d4430',weight:1.6,opacity:.55,z:4}));});
+    const[cl]=stCls(o.avg);picLayer.add(M.html(o.z.c,on?`<span class="zchip ${cl} on">${i+1}. ${o.z.name} · ${o.avg}점</span>`:`<span class="zdot ${cl}" title="${o.z.name} ${o.avg}점">${i+1}</span>`,'center',()=>{picSel=o.z;drawPicnic();fitZone(o.z);}));});
+  sel.z.all.forEach(r=>{picLayer.add(M.poly([r],{color:'#1b2b22',weight:13,opacity:.25,z:20}));picLayer.add(M.poly([r],{color:'#ffffff',weight:9,opacity:1,z:21}));picLayer.add(M.poly([r],{color:'#f0a417',weight:5,opacity:1,z:22}));});
   picLayer.add(M.html([sel.best.ll[1],sel.best.ll[0]],`<span class="rank" style="background:#e8b04b;color:#3a2a06;width:22px;height:22px;font-size:11px">★</span>`,'center'));
   $('spots').innerHTML=zs.map((o,i)=>{const[cl,tx]=stCls(o.avg);
     const side=o.w!=null&&o.i!=null&&Math.abs(o.w-o.i)>=5?(o.w<o.i?`물가 쪽이 더 좋아요 (${o.w} vs 안쪽 ${o.i})`:`안쪽이 더 좋아요 (${o.i} vs 물가 ${o.w})`):'물가·안쪽 비슷해요';
     const why=o.avg<8?'세 가지 다 거의 없어요':`주요인 ${FN2[o.main]} ${o.share}%`;
     return`<div class="spot ${o.z===picSel?'sel':''}"><button class="go" type="button" data-i="${i}"><span class="zrank ${cl}">${i+1}</span>
       <span class="bd"><b>${o.z.name}</b><span>${why} · ${side}</span></span></button><span class="status ${cl}">${tx} ${o.avg}</span></div>`;}).join('');
-  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const o=zs[+b.dataset.i];picSel=o.z;drawPicnic();M.fly(o.z.c,16);});
+  $('spots').querySelectorAll('.go').forEach(b=>b.onclick=()=>{const o=zs[+b.dataset.i];picSel=o.z;drawPicnic();fitZone(o.z);});
   const bh=bestHour(m,wd);$('picBest').textContent=hourLabel(bh);
   $('picBestSub').textContent=`${m}월 ${wd?'평일':'주말'} · ${bh>=18||bh<7?'공사 끝나고 출퇴근도 지난 시간':bh<17?'출퇴근 피한 한낮':'출퇴근 시간 전후'}`;
   $('picTitle').textContent='구간별 숨 점수';
